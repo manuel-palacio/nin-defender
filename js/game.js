@@ -691,12 +691,12 @@ class Game {
         if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0 && !this.bossActive && h > 350) {
             const fadeIn = Math.min(1, (this.quoteDuration - this.quoteTimer) / 2.0);
             const fadeOut = Math.min(1, this.quoteTimer / 3.0);
-            const alpha = Math.min(fadeIn, fadeOut) * 0.3;
+            const alpha = Math.min(fadeIn, fadeOut) * 0.7;
             ctx.save();
             ctx.globalAlpha = alpha;
             ctx.textAlign = 'center';
-            ctx.font = `italic 11px Courier New`;
-            ctx.fillStyle = '#887799';
+            ctx.font = `italic 13px Courier New`;
+            ctx.fillStyle = '#ff3333';
             ctx.fillText(`"${this.quoteText}"`, w / 2, h * 0.55);
             ctx.restore();
         }
