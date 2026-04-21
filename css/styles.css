@@ -112,6 +112,20 @@ html, body {
     opacity: 1;
 }
 
+/* Force landscape orientation on mobile */
+@media screen and (orientation: portrait) and (max-width: 768px) {
+    html {
+        transform: rotate(90deg);
+        transform-origin: left top;
+        width: 100vh;
+        height: 100vw;
+        overflow: hidden;
+        position: absolute;
+        top: 100%;
+        left: 0;
+    }
+}
+
 /* Show touch controls on touch devices */
 @media (hover: none) and (pointer: coarse) {
     #touchControls {

@@ -149,26 +149,60 @@ class AudioManager {
     playExplosion() {
         if (!this.ctx || this.muted) return;
         const now = this.ctx.currentTime;
-        const len = 0.35;
+
+        // Layer 1: Punchy low thump
+        const osc = this.ctx.createOscillator();
+        const oscGain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+        oscGain.gain.setValueAtTime(0.5, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        osc.connect(oscGain);
+        oscGain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.3);
+
+        // Layer 2: Noise crackle with resonance
+        const len = 0.5;
         const bufferSize = Math.floor(this.ctx.sampleRate * len);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+            // Shaped noise — sharp attack, rumbling tail
+            const t = i / bufferSize;
+            const env = t < 0.05 ? t / 0.05 : Math.pow(1 - t, 2);
+            data[i] = (Math.random() * 2 - 1) * env;
         }
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
-        const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + len);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.4, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + len);
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2000, now);
-        filter.frequency.exponentialRampToValueAtTime(80, now + len);
+        filter.frequency.setValueAtTime(3500, now);
+        filter.frequency.exponentialRampToValueAtTime(60, now + len);
+        filter.Q.setValueAtTime(5, now);
+        filter.Q.linearRampToValueAtTime(0.5, now + len * 0.5);
         source.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.masterGain);
         source.start(now);
+
+        // Layer 3: Mid-frequency crunch (delayed slightly)
+        const osc2 = this.ctx.createOscillator();
+        const osc2Gain = this.ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(200, now + 0.02);
+        osc2.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+        osc2Gain.gain.setValueAtTime(0, now);
+        osc2Gain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc2.connect(osc2Gain);
+        osc2Gain.connect(this.masterGain);
+        osc2.start(now);
+        osc2.stop(now + 0.25);
     }
 
     playSmallExplosion() {
@@ -260,6 +294,273 @@ class AudioManager {
         gain.connect(this.masterGain);
         osc.start(now);
         osc.stop(now + 0.1);
+    }
+}
+
+// ============================================================
+// MusicManager — Procedural dark ambient / industrial background music
+// ============================================================
+class MusicManager {
+    constructor(audioCtx, masterGain) {
+        this.ctx = audioCtx;
+        this.masterGain = masterGain;
+        this.playing = false;
+        this.intensity = 0.5;
+        this.nodes = [];          // all oscillators/sources to stop on stop()
+        this.gains = {};          // named gain nodes for intensity control
+        this.hitTimer = null;
+    }
+
+    start() {
+        if (this.playing || !this.ctx) return;
+        this.playing = true;
+
+        // ---- Master bus for all music layers ----
+        this.musicBus = this.ctx.createGain();
+        this.musicBus.gain.value = 0.18;          // keep everything subtle
+        this.musicBus.connect(this.masterGain);
+
+        this._startBassDrone();
+        this._startMidPad();
+        this._startAtmosphericShimmer();
+        this._scheduleIndustrialHit();
+    }
+
+    stop() {
+        if (!this.playing) return;
+        this.playing = false;
+
+        // Stop all running oscillators / sources
+        const now = this.ctx.currentTime;
+        this.nodes.forEach(n => {
+            try { n.stop(now + 0.05); } catch (_) { /* already stopped */ }
+        });
+        this.nodes = [];
+
+        // Fade music bus out quickly
+        if (this.musicBus) {
+            this.musicBus.gain.linearRampToValueAtTime(0, now + 0.1);
+            setTimeout(() => {
+                try { this.musicBus.disconnect(); } catch (_) {}
+            }, 200);
+        }
+
+        if (this.hitTimer) {
+            clearTimeout(this.hitTimer);
+            this.hitTimer = null;
+        }
+
+        this.gains = {};
+    }
+
+    /**
+     * Set energy level 0-1.  0 = near-silent deep drone only,
+     * 1 = all layers at full designed volume.
+     */
+    setIntensity(level) {
+        this.intensity = Math.max(0, Math.min(1, level));
+        if (!this.playing) return;
+        const now = this.ctx.currentTime;
+
+        // Bass drone: always present but scales 0.4 - 1.0
+        if (this.gains.bass) {
+            this.gains.bass.gain.linearRampToValueAtTime(
+                0.4 + this.intensity * 0.6, now + 0.3);
+        }
+        // Mid pad: scales 0 - 1
+        if (this.gains.pad) {
+            this.gains.pad.gain.linearRampToValueAtTime(
+                this.intensity, now + 0.3);
+        }
+        // Shimmer: scales 0.2 - 1
+        if (this.gains.shimmer) {
+            this.gains.shimmer.gain.linearRampToValueAtTime(
+                0.2 + this.intensity * 0.8, now + 0.3);
+        }
+    }
+
+    // ---- Layer 1: Deep bass drone ----
+    _startBassDrone() {
+        const now = this.ctx.currentTime;
+
+        // Primary sine drone
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = 45;
+
+        // Slow LFO modulating the drone pitch between ~40-55 Hz
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.07;              // very slow wobble
+
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 7;                   // +/- 7 Hz swing
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        // Volume envelope
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.7;
+        this.gains.bass = gain;
+
+        // Subtle sub-harmonic layer for warmth
+        const sub = this.ctx.createOscillator();
+        sub.type = 'sine';
+        sub.frequency.value = 22.5;              // one octave below
+        const subGain = this.ctx.createGain();
+        subGain.gain.value = 0.3;
+
+        osc.connect(gain);
+        sub.connect(subGain);
+        subGain.connect(gain);
+        gain.connect(this.musicBus);
+
+        osc.start(now);
+        lfo.start(now);
+        sub.start(now);
+        this.nodes.push(osc, lfo, sub);
+    }
+
+    // ---- Layer 2: Pulsing mid-frequency pad ----
+    _startMidPad() {
+        const now = this.ctx.currentTime;
+
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sawtooth';
+        osc.frequency.value = 140;
+
+        // Bandpass filter to keep only the narrow mid band
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 160;
+        bp.Q.value = 4;
+
+        // Amplitude LFO for pulsing effect
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.25;              // gentle pulse
+
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 0.08;
+
+        const padGain = this.ctx.createGain();
+        padGain.gain.value = 0.08;               // very low base volume
+
+        // Intensity multiplier
+        const intensityGain = this.ctx.createGain();
+        intensityGain.gain.value = this.intensity;
+        this.gains.pad = intensityGain;
+
+        // LFO modulates padGain amplitude
+        lfo.connect(lfoGain);
+        lfoGain.connect(padGain.gain);
+
+        osc.connect(bp);
+        bp.connect(padGain);
+        padGain.connect(intensityGain);
+        intensityGain.connect(this.musicBus);
+
+        osc.start(now);
+        lfo.start(now);
+        this.nodes.push(osc, lfo);
+    }
+
+    // ---- Layer 3: Occasional metallic / industrial hits ----
+    _scheduleIndustrialHit() {
+        if (!this.playing) return;
+
+        // Random delay between 4-8 seconds
+        const delay = (4 + Math.random() * 4) * 1000;
+        this.hitTimer = setTimeout(() => {
+            if (!this.playing) return;
+            this._fireHit();
+            this._scheduleIndustrialHit();
+        }, delay);
+    }
+
+    _fireHit() {
+        if (!this.ctx || !this.playing) return;
+        const now = this.ctx.currentTime;
+
+        // Noise burst
+        const len = 0.15 + Math.random() * 0.15;
+        const sampleRate = this.ctx.sampleRate;
+        const bufSize = Math.floor(sampleRate * len);
+        const buf = this.ctx.createBuffer(1, bufSize, sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+            const t = i / bufSize;
+            const env = t < 0.02 ? t / 0.02 : Math.pow(1 - t, 3);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+
+        const src = this.ctx.createBufferSource();
+        src.buffer = buf;
+
+        // Resonant bandpass gives metallic character
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = 800 + Math.random() * 2400;  // random timbre
+        bp.Q.value = 15 + Math.random() * 25;
+
+        const gain = this.ctx.createGain();
+        const vol = (0.10 + Math.random() * 0.12) * this.intensity;
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + len);
+
+        src.connect(bp);
+        bp.connect(gain);
+        gain.connect(this.musicBus);
+        src.start(now);
+
+        // Clean up — don't accumulate in this.nodes since they auto-stop
+        src.onended = () => {
+            try { bp.disconnect(); gain.disconnect(); } catch (_) {}
+        };
+    }
+
+    // ---- Layer 4: High atmospheric shimmer ----
+    _startAtmosphericShimmer() {
+        const now = this.ctx.currentTime;
+
+        const osc = this.ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = 3800;
+
+        // Slow detuned second oscillator for beating
+        const osc2 = this.ctx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.value = 3803;              // 3 Hz beating
+
+        // Tremolo LFO
+        const trem = this.ctx.createOscillator();
+        trem.type = 'sine';
+        trem.frequency.value = 0.4;
+
+        const tremGain = this.ctx.createGain();
+        tremGain.gain.value = 0.015;
+
+        const shimGain = this.ctx.createGain();
+        shimGain.gain.value = 0.015;              // very quiet
+
+        // Intensity multiplier
+        const intensityGain = this.ctx.createGain();
+        intensityGain.gain.value = 0.2 + this.intensity * 0.8;
+        this.gains.shimmer = intensityGain;
+
+        // Tremolo modulates shimmer volume
+        trem.connect(tremGain);
+        tremGain.connect(shimGain.gain);
+
+        osc.connect(shimGain);
+        osc2.connect(shimGain);
+        shimGain.connect(intensityGain);
+        intensityGain.connect(this.musicBus);
+
+        osc.start(now);
+        osc2.start(now);
+        trem.start(now);
+        this.nodes.push(osc, osc2, trem);
     }
 }
 

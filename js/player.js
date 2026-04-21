@@ -40,6 +40,48 @@ class Player {
         this.rapidFireTimer = 0;
         this.shield = false;
         this.shieldTimer = 0;
+
+        // Active shield ability (E key)
+        this.shieldCharges = 3;
+        this.maxShieldCharges = 3;
+        this.activeShield = false;
+        this.activeShieldTimer = 0;
+        this.activeShieldDuration = 2.0;
+        this.shieldRecharging = false;
+        this.shieldRechargeTimer = 0;
+        this.shieldRechargeDuration = 12;
+
+        // Screen-clearing bomb (Q key)
+        this.bombs = 2;
+        this.maxBombs = 3;
+        this.bombCooldown = 0;
+
+        // Scrap & weapon upgrades (persistent via localStorage)
+        this.scrap = parseInt(localStorage.getItem('galacticDefenderScrap') || '0', 10);
+        this.upgrades = JSON.parse(localStorage.getItem('galacticDefenderUpgrades') || '{}');
+        this.upgrades.damage   = this.upgrades.damage   || 0; // 0-5 levels
+        this.upgrades.fireRate = this.upgrades.fireRate || 0;
+        this.upgrades.speed    = this.upgrades.speed    || 0;
+        this.upgrades.bombs    = this.upgrades.bombs    || 0;
+        this.applyUpgrades();
+
+        // Trail customization
+        this.trailColors = [
+            '#00ffff', '#ff3366', '#00ff66', '#ffaa00',
+            '#ff00ff', '#4488ff', '#ffffff'
+        ];
+        this.trailColorNames = [
+            'CYAN', 'CRIMSON', 'EMERALD', 'AMBER',
+            'MAGENTA', 'COBALT', 'GHOST WHITE'
+        ];
+        this.trailIndex = parseInt(localStorage.getItem('galacticDefenderTrail') || '0', 10);
+        this.trailColor = this.trailColors[this.trailIndex];
+
+        // Combo system (tracked here for score integration)
+        this.combo = 0;
+        this.comboTimer = 0;
+        this.comboDuration = 2.0; // seconds before combo resets
+        this.maxCombo = 0;
     }
 
     reset(canvas) {
@@ -60,6 +102,17 @@ class Player {
         this.shield = false;
         this.shieldTimer = 0;
         this.fireRate = this.baseFireRate;
+        this.shieldCharges = 3;
+        this.activeShield = false;
+        this.activeShieldTimer = 0;
+        this.shieldRecharging = false;
+        this.shieldRechargeTimer = 0;
+        this.bombs = 2;
+        this.bombCooldown = 0;
+        this.combo = 0;
+        this.comboTimer = 0;
+        this.maxCombo = 0;
+        this.applyUpgrades();
     }
 
     applyPowerUp(type) {
@@ -83,8 +136,110 @@ class Player {
         }
     }
 
+    applyUpgrades() {
+        // Apply upgrade levels to base stats
+        const dmgLevel = this.upgrades ? this.upgrades.damage : 0;
+        const frLevel  = this.upgrades ? this.upgrades.fireRate : 0;
+        const spdLevel = this.upgrades ? this.upgrades.speed : 0;
+        const bmbLevel = this.upgrades ? this.upgrades.bombs : 0;
+        this.baseDamage = 1 + dmgLevel * 0.5;        // 1 → 3.5 at max
+        this.baseFireRate = 0.18 - frLevel * 0.015;   // 0.18 → 0.105 at max
+        this.fireRate = this.baseFireRate;
+        this.speed = 320 + spdLevel * 30;             // 320 → 470 at max
+        this.maxBombs = 2 + bmbLevel;                 // 2 → 7 at max
+    }
+
+    addScrap(amount) {
+        this.scrap += amount;
+        localStorage.setItem('galacticDefenderScrap', this.scrap.toString());
+    }
+
+    buyUpgrade(type) {
+        const costs = { damage: 50, fireRate: 50, speed: 40, bombs: 60 };
+        const cost = costs[type] * (this.upgrades[type] + 1);
+        if (this.scrap < cost || this.upgrades[type] >= 5) return false;
+        this.scrap -= cost;
+        this.upgrades[type]++;
+        localStorage.setItem('galacticDefenderScrap', this.scrap.toString());
+        localStorage.setItem('galacticDefenderUpgrades', JSON.stringify(this.upgrades));
+        this.applyUpgrades();
+        return true;
+    }
+
+    getUpgradeCost(type) {
+        const costs = { damage: 50, fireRate: 50, speed: 40, bombs: 60 };
+        return costs[type] * (this.upgrades[type] + 1);
+    }
+
+    cycleTrail() {
+        this.trailIndex = (this.trailIndex + 1) % this.trailColors.length;
+        this.trailColor = this.trailColors[this.trailIndex];
+        localStorage.setItem('galacticDefenderTrail', this.trailIndex.toString());
+    }
+
+    activateBomb(audio, particles, enemies) {
+        if (this.bombs <= 0 || this.bombCooldown > 0 || !this.alive) return false;
+        this.bombs--;
+        this.bombCooldown = 1.0;
+        // Kill all enemies on screen
+        let kills = 0;
+        for (const e of enemies) {
+            if (e.active) {
+                e.active = false;
+                kills++;
+                if (particles) {
+                    particles.createColorExplosion(e.x, e.y,
+                        ['#ffffff', '#ffdd00', '#ff8800'], 15, 200, 0.4, 3);
+                }
+            }
+        }
+        // Big screen flash effect
+        if (particles) {
+            particles.createColorExplosion(this.x, this.y,
+                ['#ffffff', '#ffddaa', '#ffaa44'], 60, 400, 1.0, 6);
+        }
+        if (audio) audio.playExplosion();
+        return kills;
+    }
+
+    registerKill() {
+        this.combo++;
+        this.comboTimer = this.comboDuration;
+        if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+    }
+
+    getComboMultiplier() {
+        if (this.combo < 3) return 1;
+        if (this.combo < 6) return 2;
+        if (this.combo < 10) return 3;
+        if (this.combo < 20) return 4;
+        return 5;
+    }
+
+    activateShield(audio) {
+        if (this.activeShield || this.shieldRecharging || this.shieldCharges <= 0) return;
+        this.activeShield = true;
+        this.activeShieldTimer = this.activeShieldDuration;
+        this.shieldCharges--;
+        if (audio) audio.playPowerUp();
+        // Start recharge once all charges depleted
+        if (this.shieldCharges <= 0) {
+            this.shieldRecharging = true;
+            this.shieldRechargeTimer = this.shieldRechargeDuration;
+        }
+    }
+
     hit() {
         if (this.invincible) return false;
+        // Active shield (player-triggered) absorbs hit
+        if (this.activeShield) {
+            this.activeShield = false;
+            this.activeShieldTimer = 0;
+            this.invincible = true;
+            this.invincibleTimer = 1.0;
+            return false;
+        }
+        // Power-up shield absorbs hit
         if (this.shield) {
             this.shield = false;
             this.shieldTimer = 0;
@@ -165,6 +320,34 @@ class Player {
             }
         }
 
+        // Active shield timer
+        if (this.activeShield) {
+            this.activeShieldTimer -= dt;
+            if (this.activeShieldTimer <= 0) {
+                this.activeShield = false;
+            }
+        }
+
+        // Shield recharge
+        if (this.shieldRecharging) {
+            this.shieldRechargeTimer -= dt;
+            if (this.shieldRechargeTimer <= 0) {
+                this.shieldRecharging = false;
+                this.shieldCharges = this.maxShieldCharges;
+            }
+        }
+
+        // Bomb cooldown
+        if (this.bombCooldown > 0) this.bombCooldown -= dt;
+
+        // Combo timer
+        if (this.comboTimer > 0) {
+            this.comboTimer -= dt;
+            if (this.comboTimer <= 0) {
+                this.combo = 0;
+            }
+        }
+
         // Invincibility
         if (this.invincible) {
             this.invincibleTimer -= dt;
@@ -186,9 +369,10 @@ class Player {
         const tipY = this.y;
 
         // Center shot
+        const dmg = this.baseDamage || 1;
         const p = projectilePool.get();
         if (p) {
-            p.init(tipX, tipY, bulletSpeed, 0, '#00ffff', '#00ffff', false);
+            p.init(tipX, tipY, bulletSpeed, 0, '#00ffff', '#00ffff', false, dmg);
         }
 
         // Triple shot extras
@@ -238,7 +422,10 @@ class Player {
             const img = this.assets.playerShip;
             const drawH = this.height * 2;
             const drawW = drawH * (img.width / img.height);
+            ctx.save();
+            ctx.rotate(Math.PI / 2); // sprite faces up → rotate to face right
             ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.restore();
         } else {
             ctx.fillStyle = '#ddeeff';
             ctx.strokeStyle = '#00ffff';
@@ -264,16 +451,40 @@ class Player {
             ctx.fill();
         }
 
-        // Shield effect
-        if (this.shield) {
+        // Shield effect — power-up or active shield
+        if (this.shield || this.activeShield) {
             const sPulse = 0.6 + 0.4 * Math.sin(this.engineTime * 4);
-            ctx.strokeStyle = `rgba(0, 170, 255, ${sPulse * 0.7})`;
-            ctx.shadowColor = '#00aaff';
-            ctx.shadowBlur = 15;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
-            ctx.stroke();
+            const isActive = this.activeShield;
+            // Active shield is brighter, hexagonal
+            if (isActive) {
+                const sr = this.radius + 10;
+                ctx.strokeStyle = `rgba(0, 220, 255, ${sPulse * 0.8})`;
+                ctx.shadowColor = '#00ddff';
+                ctx.shadowBlur = 20 * sPulse;
+                ctx.lineWidth = 2.5;
+                // Hexagon shape
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+                    const hx = Math.cos(a) * sr;
+                    const hy = Math.sin(a) * sr;
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                // Inner glow fill
+                ctx.fillStyle = `rgba(0, 180, 255, ${0.08 * sPulse})`;
+                ctx.fill();
+            } else {
+                ctx.strokeStyle = `rgba(0, 170, 255, ${sPulse * 0.7})`;
+                ctx.shadowColor = '#00aaff';
+                ctx.shadowBlur = 15;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         }
 
         ctx.restore();
@@ -284,7 +495,7 @@ class Player {
         particles.createTrail(
             this.x - this.width / 2,
             this.y,
-            '#00ffff',
+            this.trailColor || '#00ffff',
             2.5
         );
     }

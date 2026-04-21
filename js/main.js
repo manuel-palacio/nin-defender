@@ -5,6 +5,11 @@
 (function () {
     'use strict';
 
+    // Request landscape orientation on mobile
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     let game = null;
