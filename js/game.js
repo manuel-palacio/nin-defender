@@ -687,19 +687,17 @@ class Game {
             ctx.fillText(`PHASE ${this.lastPhase + 1}: ${PHASES[this.lastPhase].name}`, w / 2, 18);
         }
 
-        // NIN quote — top center, fading in/out as background atmosphere
-        if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0) {
+        // NIN quote — bottom center, small, fading (skip on tiny screens)
+        if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0 && !this.bossActive && h > 350) {
             const fadeIn = Math.min(1, (this.quoteDuration - this.quoteTimer) / 2.0);
             const fadeOut = Math.min(1, this.quoteTimer / 3.0);
-            const alpha = Math.min(fadeIn, fadeOut) * 0.35;
+            const alpha = Math.min(fadeIn, fadeOut) * 0.3;
             ctx.save();
             ctx.globalAlpha = alpha;
             ctx.textAlign = 'center';
-            ctx.font = `bold italic ${Math.min(w * 0.03, 24)}px Courier New`;
-            ctx.fillStyle = '#aa88cc';
-            ctx.shadowColor = '#8855aa';
-            ctx.shadowBlur = 10;
-            ctx.fillText(`"${this.quoteText}"`, w / 2, h * 0.08);
+            ctx.font = `italic 11px Courier New`;
+            ctx.fillStyle = '#887799';
+            ctx.fillText(`"${this.quoteText}"`, w / 2, h * 0.55);
             ctx.restore();
         }
 

@@ -328,7 +328,7 @@ class MusicManager {
 
         this._startBassDrone();
         this._startMidPad();
-        this._startAtmosphericShimmer();
+        this._startMidMelody();
         this._scheduleIndustrialHit();
     }
 
@@ -355,6 +355,10 @@ class MusicManager {
             clearTimeout(this.hitTimer);
             this.hitTimer = null;
         }
+        if (this._melodyInterval) {
+            clearInterval(this._melodyInterval);
+            this._melodyInterval = null;
+        }
 
         this.gains = {};
     }
@@ -377,6 +381,11 @@ class MusicManager {
         if (this.gains.pad) {
             this.gains.pad.gain.linearRampToValueAtTime(
                 this.intensity, now + 0.3);
+        }
+        // Melody: scales 0.3 - 1
+        if (this.gains.melody) {
+            this.gains.melody.gain.linearRampToValueAtTime(
+                0.3 + this.intensity * 0.7, now + 0.3);
         }
         // Shimmer: scales 0.2 - 1
         if (this.gains.shimmer) {
@@ -469,6 +478,60 @@ class MusicManager {
         osc.start(now);
         lfo.start(now);
         this.nodes.push(osc, lfo);
+    }
+
+    // ---- Layer 2b: Mid-range melody (audible on phone speakers) ----
+    _startMidMelody() {
+        if (!this.ctx) return;
+        // Slow dark arpeggio cycling through minor-key notes
+        const notes = [220, 261, 293, 220, 196, 233, 261, 196]; // Am-ish
+        let noteIdx = 0;
+
+        const osc = this.ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = notes[0];
+
+        // Slow LFO vibrato
+        const vibrato = this.ctx.createOscillator();
+        vibrato.type = 'sine';
+        vibrato.frequency.value = 4;
+        const vibratoGain = this.ctx.createGain();
+        vibratoGain.gain.value = 3;
+        vibrato.connect(vibratoGain);
+        vibratoGain.connect(osc.frequency);
+
+        // Bandpass to give it a muffled, distant feel
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 400;
+        filter.Q.value = 2;
+
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.12;
+
+        const intensityGain = this.ctx.createGain();
+        intensityGain.gain.value = this.intensity;
+        this.gains.melody = intensityGain;
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(intensityGain);
+        intensityGain.connect(this.musicBus);
+
+        osc.start(this.ctx.currentTime);
+        vibrato.start(this.ctx.currentTime);
+        this.nodes.push(osc, vibrato);
+
+        // Cycle notes slowly
+        this._melodyInterval = setInterval(() => {
+            if (!this.playing) {
+                clearInterval(this._melodyInterval);
+                return;
+            }
+            noteIdx = (noteIdx + 1) % notes.length;
+            const now = this.ctx.currentTime;
+            osc.frequency.linearRampToValueAtTime(notes[noteIdx], now + 0.3);
+        }, 2000);
     }
 
     // ---- Layer 3: Occasional metallic / industrial hits ----
