@@ -5,9 +5,32 @@
 (function () {
     'use strict';
 
-    // Request landscape orientation on mobile
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(() => {});
+    // ---- Mobile detection ----
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+    if (isTouchDevice) {
+        document.body.classList.add('touch-device');
+
+        // Request landscape orientation
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
+
+        // Track portrait/landscape and toggle warning
+        function checkOrientation() {
+            if (window.innerHeight > window.innerWidth) {
+                document.body.classList.add('touch-portrait');
+                document.body.classList.remove('touch-device');
+            } else {
+                document.body.classList.remove('touch-portrait');
+                document.body.classList.add('touch-device');
+            }
+        }
+        checkOrientation();
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(checkOrientation, 200);
+        });
     }
 
     const canvas = document.getElementById('gameCanvas');

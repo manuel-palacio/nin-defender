@@ -186,33 +186,29 @@ html, body {
     background: rgba(255, 136, 0, 0.4);
 }
 
-/* ===== MOBILE: Show touch controls on touch devices (landscape) ===== */
-@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
-    #touchControls {
-        display: block;
-    }
-    #touchActions {
-        display: flex;
-    }
-    #gameCanvas {
-        cursor: none;
-    }
-    #muteBtn {
-        top: auto;
-        bottom: 180px;
-        right: 20px;
-    }
+/* ===== MOBILE: JS adds .touch-device to body ===== */
+body.touch-device #touchControls {
+    display: block;
+}
+body.touch-device #touchActions {
+    display: flex;
+}
+body.touch-device #gameCanvas {
+    cursor: none;
+}
+body.touch-device #muteBtn {
+    top: auto;
+    bottom: 180px;
+    right: 20px;
 }
 
-/* ===== MOBILE: Portrait — show rotate warning, hide game ===== */
-@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-    #portraitWarning {
-        display: flex;
-    }
-    #gameCanvas,
-    #touchControls,
-    #touchActions,
-    #muteBtn {
-        display: none !important;
-    }
+/* Portrait warning — shown by JS when touch + portrait */
+body.touch-portrait #portraitWarning {
+    display: flex;
+}
+body.touch-portrait #gameCanvas,
+body.touch-portrait #touchControls,
+body.touch-portrait #touchActions,
+body.touch-portrait #muteBtn {
+    display: none !important;
 }
