@@ -28,12 +28,13 @@ class PowerUp {
         this.bobOffset = Math.random() * Math.PI * 2;
     }
 
-    init(x, y, type) {
+    init(x, y, type, assets) {
         this.x = x;
         this.y = y;
         this.vx = -100;          // drift left
         this.vy = 0;
         this.type = type;
+        this.assets = assets || {};
         this.active = true;
         this.time = 0;
         this.bobOffset = Math.random() * Math.PI * 2;
@@ -68,27 +69,37 @@ class PowerUp {
         ctx.arc(this.x, this.y, r + 4, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Inner filled circle
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = info.color;
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
-        ctx.fill();
+        // Inner — sprite icon or filled circle with letter
+        const assetKey = POWERUP_ASSET_MAP[this.type];
+        const iconImg = this.assets && this.assets[assetKey];
 
-        // Icon inside — simple symbols
-        ctx.fillStyle = '#000';
-        ctx.shadowBlur = 0;
-        ctx.font = `bold ${Math.floor(r)}px Courier New`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        if (iconImg) {
+            ctx.globalAlpha = 0.95;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = info.color;
+            const imgSize = r * 2;
+            ctx.drawImage(iconImg, this.x - imgSize / 2, this.y - imgSize / 2, imgSize, imgSize);
+        } else {
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = info.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+            ctx.fill();
 
-        let icon = '?';
-        if (this.type === 'RAPID_FIRE')  icon = 'R';
-        if (this.type === 'TRIPLE_SHOT') icon = 'T';
-        if (this.type === 'SHIELD')      icon = 'S';
-        if (this.type === 'EXTRA_LIFE')  icon = '+';
-        ctx.fillText(icon, this.x, this.y + 1);
+            ctx.fillStyle = '#000';
+            ctx.shadowBlur = 0;
+            ctx.font = `bold ${Math.floor(r)}px Courier New`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            let icon = '?';
+            if (this.type === 'RAPID_FIRE')  icon = 'R';
+            if (this.type === 'TRIPLE_SHOT') icon = 'T';
+            if (this.type === 'SHIELD')      icon = 'S';
+            if (this.type === 'EXTRA_LIFE')  icon = '+';
+            ctx.fillText(icon, this.x, this.y + 1);
+        }
 
         ctx.restore();
     }

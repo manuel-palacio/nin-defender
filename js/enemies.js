@@ -103,8 +103,9 @@ class Asteroid extends Enemy {
 // EnemyShip — Triangular ship that shoots back, 2-3 HP
 // ============================================================
 class EnemyShip extends Enemy {
-    constructor(canvasW, canvasH, tier = 1) {
+    constructor(canvasW, canvasH, tier = 1, assets = {}) {
         super();
+        this.assets = assets;
         this.type = 'ship';
         this.tier = tier; // 1 = small, 2 = large
         this.radius = tier === 1 ? 16 : 24;
@@ -164,10 +165,8 @@ class EnemyShip extends Enemy {
 
         const r = this.radius;
         const flicker = 0.7 + 0.3 * Math.sin(this.engineFlicker);
-        const hsl = `hsl(${this.hue}, 100%, 50%)`;
-        const hslDim = `hsl(${this.hue}, 80%, 30%)`;
 
-        // Engine glow
+        // Engine glow (always drawn)
         ctx.fillStyle = `rgba(255, 50, 50, ${0.3 * flicker})`;
         ctx.shadowColor = '#ff3333';
         ctx.shadowBlur = 8 * flicker;
@@ -178,28 +177,38 @@ class EnemyShip extends Enemy {
         ctx.closePath();
         ctx.fill();
 
-        // Ship body — pointed left (facing player)
-        ctx.fillStyle = hslDim;
-        ctx.strokeStyle = hsl;
-        ctx.shadowColor = hsl;
-        ctx.shadowBlur = 6;
-        ctx.lineWidth = 1.5;
+        // Ship body — sprite or Canvas fallback
+        const spriteKey = this.tier === 2 ? 'enemyLarge' : 'enemySmall';
+        if (this.assets[spriteKey]) {
+            const img = this.assets[spriteKey];
+            const drawH = r * 2.2;
+            const drawW = drawH * (img.width / img.height);
+            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        } else {
+            const hsl = `hsl(${this.hue}, 100%, 50%)`;
+            const hslDim = `hsl(${this.hue}, 80%, 30%)`;
 
-        ctx.beginPath();
-        ctx.moveTo(-r, 0);             // nose (faces left)
-        ctx.lineTo(r * 0.4, -r * 0.7); // top wing
-        ctx.lineTo(r * 0.3, 0);        // rear center
-        ctx.lineTo(r * 0.4, r * 0.7);  // bottom wing
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+            ctx.fillStyle = hslDim;
+            ctx.strokeStyle = hsl;
+            ctx.shadowColor = hsl;
+            ctx.shadowBlur = 6;
+            ctx.lineWidth = 1.5;
 
-        // Cockpit
-        ctx.fillStyle = hsl;
-        ctx.shadowBlur = 3;
-        ctx.beginPath();
-        ctx.arc(-r * 0.3, 0, r * 0.15, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-r, 0);
+            ctx.lineTo(r * 0.4, -r * 0.7);
+            ctx.lineTo(r * 0.3, 0);
+            ctx.lineTo(r * 0.4, r * 0.7);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = hsl;
+            ctx.shadowBlur = 3;
+            ctx.beginPath();
+            ctx.arc(-r * 0.3, 0, r * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // Health bar (if damaged)
         if (this.hp < this.maxHp) {
@@ -221,7 +230,8 @@ class EnemyShip extends Enemy {
 // EnemySpawner — Manages waves with difficulty scaling
 // ============================================================
 class EnemySpawner {
-    constructor() {
+    constructor(assets) {
+        this.assets = assets || {};
         this.timer = 0;
         this.baseInterval = 1.5; // seconds between spawns
         this.enemies = [];
@@ -242,7 +252,7 @@ class EnemySpawner {
             const roll = Math.random();
             if (roll < shipChance) {
                 const tier = Math.random() < largeTier ? 2 : 1;
-                const ship = new EnemyShip(canvasW, canvasH, tier);
+                const ship = new EnemyShip(canvasW, canvasH, tier, this.assets);
                 ship.canvas_w = canvasW;
                 this.enemies.push(ship);
             } else {

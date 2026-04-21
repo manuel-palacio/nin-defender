@@ -37,6 +37,23 @@ const Utils = {
             points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
         }
         return points;
+    },
+
+    // Draw image with CSS "cover" behaviour — fills canvas, center-crops overflow
+    drawCover(ctx, img, w, h) {
+        const imgRatio = img.width / img.height;
+        const canvasRatio = w / h;
+        let dw, dh, dx, dy;
+        if (imgRatio > canvasRatio) {
+            dh = h;
+            dw = h * imgRatio;
+        } else {
+            dw = w;
+            dh = w / imgRatio;
+        }
+        dx = (w - dw) / 2;
+        dy = (h - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
     }
 };
 
@@ -243,5 +260,106 @@ class AudioManager {
         gain.connect(this.masterGain);
         osc.start(now);
         osc.stop(now + 0.1);
+    }
+}
+
+// ============================================================
+// Asset manifest — drop PNGs into assets/ to upgrade visuals
+// ============================================================
+const ASSET_MANIFEST = {
+    splashBg:    'assets/splash-bg.png',
+    gameoverBg:  'assets/gameover-bg.png',
+    playerShip:  'assets/player-ship.png',
+    enemySmall:  'assets/enemy-small.png',
+    enemyLarge:  'assets/enemy-large.png',
+    moon:        'assets/moon.png',
+    puRapidFire: 'assets/powerups/rapid-fire.png',
+    puTripleShot:'assets/powerups/triple-shot.png',
+    puShield:    'assets/powerups/shield.png',
+    puExtraLife: 'assets/powerups/extra-life.png'
+};
+
+// Maps power-up type keys to asset keys
+const POWERUP_ASSET_MAP = {
+    RAPID_FIRE:  'puRapidFire',
+    TRIPLE_SHOT: 'puTripleShot',
+    SHIELD:      'puShield',
+    EXTRA_LIFE:  'puExtraLife'
+};
+
+// ============================================================
+// AssetLoader — Preloads images, silently skips missing ones
+// ============================================================
+class AssetLoader {
+    constructor() {
+        this.assets = {};
+        this.loaded = 0;
+        this.total = 0;
+    }
+
+    load(manifest) {
+        const entries = Object.entries(manifest);
+        this.total = entries.length;
+        this.loaded = 0;
+
+        const promises = entries.map(([key, path]) => {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => {
+                    this.assets[key] = img;
+                    this.loaded++;
+                    resolve();
+                };
+                img.onerror = () => {
+                    this.assets[key] = null; // graceful fallback
+                    this.loaded++;
+                    resolve();
+                };
+                img.src = path;
+            });
+        });
+
+        return Promise.all(promises).then(() => this.assets);
+    }
+
+    getProgress() {
+        return this.total === 0 ? 1 : this.loaded / this.total;
+    }
+
+    // Draw a loading bar on canvas while assets load
+    static drawLoadingScreen(ctx, canvas, progress) {
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Background
+        ctx.fillStyle = '#0a0a1f';
+        ctx.fillRect(0, 0, w, h);
+
+        // Title
+        ctx.textAlign = 'center';
+        ctx.font = `bold ${Math.min(w * 0.05, 36)}px Courier New`;
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 15;
+        ctx.fillText('GALACTIC DEFENDER', w / 2, h * 0.4);
+
+        // Loading text
+        ctx.shadowBlur = 0;
+        ctx.font = '14px Courier New';
+        ctx.fillStyle = '#888';
+        ctx.fillText('LOADING ASSETS...', w / 2, h * 0.52);
+
+        // Progress bar
+        const barW = Math.min(300, w * 0.6);
+        const barH = 6;
+        const bx = (w - barW) / 2;
+        const by = h * 0.57;
+        ctx.fillStyle = '#222';
+        ctx.fillRect(bx, by, barW, barH);
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowColor = '#00ffff';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(bx, by, barW * progress, barH);
+        ctx.shadowBlur = 0;
     }
 }

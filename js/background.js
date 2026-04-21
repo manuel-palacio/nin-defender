@@ -44,8 +44,9 @@ class Star {
 // Moon — Large crescent with craters, domes, and antenna towers
 // ============================================================
 class Moon {
-    constructor(canvas) {
+    constructor(canvas, assets) {
         this.canvas = canvas;
+        this.assets = assets || {};
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.2;
         this.radius = Math.min(canvas.width, canvas.height) * 0.15;
@@ -99,7 +100,18 @@ class Moon {
 
         ctx.save();
 
-        // Moon body — subtle gradient
+        // Moon sprite — if available, draw image and skip procedural rendering
+        if (this.assets.moon) {
+            const img = this.assets.moon;
+            const drawSize = r * 2.4;
+            const drawW = drawSize * (img.width / img.height);
+            ctx.globalAlpha = 0.9;
+            ctx.drawImage(img, x - drawW / 2, y - drawSize / 2, drawW, drawSize);
+            ctx.restore();
+            return;
+        }
+
+        // Moon body — subtle gradient (Canvas fallback)
         const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
         grad.addColorStop(0, '#e8e0d0');
         grad.addColorStop(0.6, '#c4b89a');
@@ -194,11 +206,12 @@ class Moon {
 // Background — Assembles all layers
 // ============================================================
 class Background {
-    constructor(canvas) {
+    constructor(canvas, assets) {
         this.canvas = canvas;
+        this.assets = assets || {};
         this.time = 0;
         this.layers = [];
-        this.moon = new Moon(canvas);
+        this.moon = new Moon(canvas, this.assets);
         this.buildLayers();
     }
 

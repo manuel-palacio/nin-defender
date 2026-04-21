@@ -10,18 +10,19 @@ const STATE = {
 };
 
 class Game {
-    constructor(canvas, ctx) {
+    constructor(canvas, ctx, assets) {
         this.canvas = canvas;
         this.ctx = ctx;
+        this.assets = assets || {};
 
         // Sub-systems
         this.audio = new AudioManager();
         this.shake = new ScreenShake();
-        this.background = new Background(canvas);
+        this.background = new Background(canvas, this.assets);
         this.particles = new ParticlePool(600);
         this.projectiles = new ProjectilePool(200);
-        this.spawner = new EnemySpawner();
-        this.player = new Player(canvas);
+        this.spawner = new EnemySpawner(this.assets);
+        this.player = new Player(canvas, this.assets);
         this.powerups = [];
 
         // State
@@ -167,7 +168,8 @@ class Game {
         pu.init(
             this.canvas.width + 20,
             Utils.random(40, this.canvas.height - 40),
-            type
+            type,
+            this.assets
         );
         this.powerups.push(pu);
     }
@@ -367,9 +369,17 @@ class Game {
         const h = this.canvas.height;
 
         ctx.save();
-        // Darken
-        ctx.fillStyle = 'rgba(10, 10, 31, 0.6)';
-        ctx.fillRect(0, 0, w, h);
+
+        // Background image or darken overlay
+        if (this.assets.splashBg) {
+            Utils.drawCover(ctx, this.assets.splashBg, w, h);
+            // Darken slightly so text is readable
+            ctx.fillStyle = 'rgba(10, 10, 31, 0.45)';
+            ctx.fillRect(0, 0, w, h);
+        } else {
+            ctx.fillStyle = 'rgba(10, 10, 31, 0.6)';
+            ctx.fillRect(0, 0, w, h);
+        }
 
         // Title
         ctx.textAlign = 'center';
@@ -445,8 +455,15 @@ class Game {
         const w = this.canvas.width;
         const h = this.canvas.height;
         ctx.save();
-        ctx.fillStyle = 'rgba(10, 10, 31, 0.75)';
-        ctx.fillRect(0, 0, w, h);
+
+        if (this.assets.gameoverBg) {
+            Utils.drawCover(ctx, this.assets.gameoverBg, w, h);
+            ctx.fillStyle = 'rgba(10, 10, 31, 0.5)';
+            ctx.fillRect(0, 0, w, h);
+        } else {
+            ctx.fillStyle = 'rgba(10, 10, 31, 0.75)';
+            ctx.fillRect(0, 0, w, h);
+        }
         ctx.textAlign = 'center';
 
         ctx.font = `bold ${Math.min(w * 0.06, 48)}px Courier New`;

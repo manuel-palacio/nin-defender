@@ -3,8 +3,9 @@
 // ============================================================
 
 class Player {
-    constructor(canvas) {
+    constructor(canvas, assets) {
         this.canvas = canvas;
+        this.assets = assets || {};
         this.x = 80;
         this.y = canvas.height / 2;
         this.width = 40;
@@ -209,14 +210,13 @@ class Player {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Engine trail — flickering cyan/blue flame
+        // Engine trail — flickering cyan/blue flame (always drawn, even with sprite)
         const flicker = 0.7 + 0.3 * Math.sin(this.engineTime * 25);
         const trailLen = 15 + 5 * flicker;
 
         ctx.save();
         ctx.shadowColor = '#00ffff';
         ctx.shadowBlur = 12 * flicker;
-        // Main flame
         ctx.fillStyle = `rgba(0, 255, 255, ${0.5 * flicker})`;
         ctx.beginPath();
         ctx.moveTo(-this.width / 2, -4);
@@ -224,7 +224,6 @@ class Player {
         ctx.lineTo(-this.width / 2, 4);
         ctx.closePath();
         ctx.fill();
-        // Inner white core
         ctx.fillStyle = `rgba(255, 255, 255, ${0.4 * flicker})`;
         ctx.beginPath();
         ctx.moveTo(-this.width / 2, -2);
@@ -234,30 +233,36 @@ class Player {
         ctx.fill();
         ctx.restore();
 
-        // Ship body — sleek arrow shape
-        ctx.fillStyle = '#ddeeff';
-        ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 8;
+        // Ship body — sprite or Canvas fallback
+        if (this.assets.playerShip) {
+            const img = this.assets.playerShip;
+            const drawH = this.height * 2;
+            const drawW = drawH * (img.width / img.height);
+            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        } else {
+            ctx.fillStyle = '#ddeeff';
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 1.5;
+            ctx.shadowColor = '#00ffff';
+            ctx.shadowBlur = 8;
 
-        ctx.beginPath();
-        ctx.moveTo(this.width / 2, 0);                     // nose
-        ctx.lineTo(-this.width / 2 + 5, -this.height / 2); // top wing
-        ctx.lineTo(-this.width / 2, -this.height / 2 + 5); // wing notch
-        ctx.lineTo(-this.width / 2 + 8, 0);                // rear center
-        ctx.lineTo(-this.width / 2, this.height / 2 - 5);  // wing notch
-        ctx.lineTo(-this.width / 2 + 5, this.height / 2);  // bottom wing
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(this.width / 2, 0);
+            ctx.lineTo(-this.width / 2 + 5, -this.height / 2);
+            ctx.lineTo(-this.width / 2, -this.height / 2 + 5);
+            ctx.lineTo(-this.width / 2 + 8, 0);
+            ctx.lineTo(-this.width / 2, this.height / 2 - 5);
+            ctx.lineTo(-this.width / 2 + 5, this.height / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
 
-        // Cockpit window
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowBlur = 4;
-        ctx.beginPath();
-        ctx.ellipse(5, 0, 5, 3, 0, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowBlur = 4;
+            ctx.beginPath();
+            ctx.ellipse(5, 0, 5, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         // Shield effect
         if (this.shield) {
