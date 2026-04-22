@@ -18,8 +18,8 @@ class Player {
         this.friction = 0.88;
 
         // Combat
-        this.lives = 3;
-        this.maxLives = 5;
+        this.lives = 6;
+        this.maxLives = 8;
         this.shootCooldown = 0;
         this.baseFireRate = 0.18; // seconds between shots
         this.fireRate = this.baseFireRate;
@@ -90,7 +90,7 @@ class Player {
         this.y = canvas.height / 2;
         this.vx = 0;
         this.vy = 0;
-        this.lives = 3;
+        this.lives = 6;
         this.invincible = false;
         this.invincibleTimer = 0;
         this.alive = true;
