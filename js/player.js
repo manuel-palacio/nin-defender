@@ -41,6 +41,11 @@ class Player {
         this.shield = false;
         this.shieldTimer = 0;
 
+        // Death Ray (laser beam power-up)
+        this.deathRay = false;
+        this.deathRayTimer = 0;
+        this.deathRayWidth = 40; // beam thickness
+
         // Active shield ability (E key)
         this.shieldCharges = 3;
         this.maxShieldCharges = 3;
@@ -101,6 +106,8 @@ class Player {
         this.rapidFireTimer = 0;
         this.shield = false;
         this.shieldTimer = 0;
+        this.deathRay = false;
+        this.deathRayTimer = 0;
         this.fireRate = this.baseFireRate;
         this.shieldCharges = 3;
         this.activeShield = false;
@@ -132,6 +139,10 @@ class Player {
                 break;
             case 'EXTRA_LIFE':
                 if (this.lives < this.maxLives) this.lives++;
+                break;
+            case 'DEATH_RAY':
+                this.deathRay = true;
+                this.deathRayTimer = POWERUP_TYPES.DEATH_RAY.duration;
                 break;
         }
     }
@@ -320,6 +331,14 @@ class Player {
             }
         }
 
+        // Death Ray timer
+        if (this.deathRay) {
+            this.deathRayTimer -= dt;
+            if (this.deathRayTimer <= 0) {
+                this.deathRay = false;
+            }
+        }
+
         // Active shield timer
         if (this.activeShield) {
             this.activeShieldTimer -= dt;
@@ -484,6 +503,65 @@ class Player {
                 ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
                 ctx.stroke();
             }
+        }
+
+        // Death Ray beam
+        if (this.deathRay) {
+            ctx.save();
+            // Reset translate since beam needs screen coords
+            ctx.restore();
+            ctx.save();
+
+            const beamX = this.x + this.width / 2;
+            const beamY = this.y;
+            const beamW = this.canvas.width - beamX + 50;
+            const halfH = this.deathRayWidth / 2;
+            const t = Date.now() / 1000;
+            const flicker = 0.8 + 0.2 * Math.sin(t * 20);
+
+            // Outer glow
+            const outerGrad = ctx.createLinearGradient(beamX, beamY - halfH * 2, beamX, beamY + halfH * 2);
+            outerGrad.addColorStop(0, 'rgba(204, 0, 0, 0)');
+            outerGrad.addColorStop(0.3, `rgba(255, 30, 0, ${0.15 * flicker})`);
+            outerGrad.addColorStop(0.5, `rgba(255, 50, 0, ${0.3 * flicker})`);
+            outerGrad.addColorStop(0.7, `rgba(255, 30, 0, ${0.15 * flicker})`);
+            outerGrad.addColorStop(1, 'rgba(204, 0, 0, 0)');
+            ctx.fillStyle = outerGrad;
+            ctx.fillRect(beamX, beamY - halfH * 2, beamW, halfH * 4);
+
+            // Core beam
+            const coreGrad = ctx.createLinearGradient(beamX, beamY - halfH, beamX, beamY + halfH);
+            coreGrad.addColorStop(0, 'rgba(255, 50, 0, 0.1)');
+            coreGrad.addColorStop(0.3, `rgba(255, 100, 50, ${0.7 * flicker})`);
+            coreGrad.addColorStop(0.5, `rgba(255, 200, 150, ${0.9 * flicker})`);
+            coreGrad.addColorStop(0.7, `rgba(255, 100, 50, ${0.7 * flicker})`);
+            coreGrad.addColorStop(1, 'rgba(255, 50, 0, 0.1)');
+            ctx.fillStyle = coreGrad;
+            ctx.shadowColor = '#ff2200';
+            ctx.shadowBlur = 20 * flicker;
+            ctx.fillRect(beamX, beamY - halfH, beamW, halfH * 2);
+
+            // Hot white center line
+            ctx.fillStyle = `rgba(255, 255, 220, ${0.6 * flicker})`;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffffff';
+            ctx.fillRect(beamX, beamY - 3, beamW, 6);
+
+            // NIN text stamped along the beam
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 18px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const spacing = 80;
+            const scrollOffset = (t * 200) % spacing;
+            for (let nx = beamX + 30 - scrollOffset; nx < beamX + beamW; nx += spacing) {
+                const textAlpha = 0.4 + 0.3 * Math.sin(t * 8 + nx * 0.05);
+                ctx.fillStyle = `rgba(255, 255, 255, ${textAlpha})`;
+                ctx.fillText('NIN', nx, beamY);
+            }
+
+            ctx.restore();
+            return; // skip the normal ctx.restore below
         }
 
         ctx.restore();

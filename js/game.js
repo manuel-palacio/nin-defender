@@ -347,6 +347,11 @@ class Game {
             }
         }
 
+        // Stop death ray sound when it expires
+        if (!this.player.deathRay && this.audio._deathRayNodes) {
+            this.audio.stopDeathRay();
+        }
+
         // Music intensity scales with phase (10 phases)
         if (this.music && this.music.playing) {
             this.music.setIntensity(Math.min(1, (this.lastPhase + 1) / 10));
@@ -497,6 +502,37 @@ class Game {
             }
         }
 
+        // Death Ray → enemies (beam kills everything in its path)
+        if (this.player.deathRay && this.player.alive) {
+            const beamX = this.player.x + this.player.width / 2;
+            const beamY = this.player.y;
+            const halfH = this.player.deathRayWidth / 2;
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                if (!e.active) continue;
+                // Enemy is in the beam if it's to the right of the ship and within beam height
+                if (e.x > beamX - e.radius && Math.abs(e.y - beamY) < halfH + e.radius) {
+                    e.active = false;
+                    this.player.registerKill();
+                    const multiplier = this.player.getComboMultiplier();
+                    this.score += e.points * multiplier;
+                    this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
+                    // Big explosion for every kill
+                    this.particles.createColorExplosion(e.x, e.y,
+                        ['#ff2200', '#ff6600', '#ffaa00', '#ffffff', '#cc0000'],
+                        40, 350, 1.0, 6);
+                    this.shake.shake(4, 0.1);
+                    this.audio.playExplosion();
+                }
+            }
+            // Beam also destroys enemy bullets
+            for (const bullet of enemyBullets) {
+                if (bullet.x > beamX && Math.abs(bullet.y - beamY) < halfH + 5) {
+                    bullet.active = false;
+                }
+            }
+        }
+
         // Enemy bullets → player
         if (this.player.alive) {
             for (const bullet of enemyBullets) {
@@ -527,6 +563,7 @@ class Game {
                     const info = POWERUP_TYPES[pu.type];
                     this.particles.createExplosion(pu.x, pu.y, info.color, 15, 150, 0.4, 3);
                     this.audio.playPowerUp();
+                    if (pu.type === 'DEATH_RAY') this.audio.startDeathRay();
                     pu.active = false;
                     this.powerups.splice(i, 1);
                 }
@@ -676,6 +713,14 @@ class Game {
         if (this.player.activeShield) {
             ctx.fillStyle = '#aaa';
             ctx.fillText(`SHIELD ACTIVE ${Math.ceil(this.player.activeShieldTimer)}s`, 16, puY);
+            puY += 18;
+        }
+        if (this.player.deathRay) {
+            ctx.fillStyle = '#cc0000';
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 6;
+            ctx.fillText(`DEATH RAY ${Math.ceil(this.player.deathRayTimer)}s`, 16, puY);
+            ctx.shadowBlur = 0;
             puY += 18;
         }
 

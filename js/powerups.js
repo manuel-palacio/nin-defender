@@ -6,7 +6,8 @@ const POWERUP_TYPES = {
     RAPID_FIRE:  { name: 'Rapid Fire',  color: '#ffdd00', duration: 8 },
     TRIPLE_SHOT: { name: 'Triple Shot', color: '#00ff66', duration: 10 },
     SHIELD:      { name: 'Shield',      color: '#00aaff', duration: 12 },
-    EXTRA_LIFE:  { name: 'Extra Life',  color: '#ff66cc', duration: 0 }
+    EXTRA_LIFE:  { name: 'Extra Life',  color: '#ff66cc', duration: 0 },
+    DEATH_RAY:   { name: 'Death Ray',   color: '#cc0000', duration: 4 }
 };
 
 const POWERUP_KEYS = Object.keys(POWERUP_TYPES);
@@ -98,6 +99,7 @@ class PowerUp {
             if (this.type === 'TRIPLE_SHOT') icon = 'T';
             if (this.type === 'SHIELD')      icon = 'S';
             if (this.type === 'EXTRA_LIFE')  icon = '+';
+            if (this.type === 'DEATH_RAY')   icon = 'N';
             ctx.fillText(icon, this.x, this.y + 1);
         }
 
