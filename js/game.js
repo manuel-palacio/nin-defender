@@ -451,19 +451,19 @@ class Game {
                             }
                         }
 
-                        // Asteroid splitting — big asteroids spawn 2-3 small fragments
-                        if (e.type === 'asteroid' && e.sizeMultiplier >= 1.4) {
-                            const fragCount = Utils.randomInt(2, 3);
+                        // Asteroid splitting — all asteroids above fragment size break apart
+                        if (e.type === 'asteroid' && e.sizeMultiplier >= 0.8) {
+                            const fragCount = e.sizeMultiplier >= 1.4 ? Utils.randomInt(2, 4) : Utils.randomInt(2, 3);
+                            const fragSize = e.sizeMultiplier >= 1.4 ? Utils.random(0.5, 0.7) : Utils.random(0.3, 0.5);
                             for (let f = 0; f < fragCount; f++) {
                                 const frag = new Asteroid(
                                     this.canvas.width, this.canvas.height,
-                                    Utils.random(0.5, 0.7), // small fragment
+                                    fragSize,
                                     e.x, e.y
                                 );
-                                // Scatter in different directions
                                 const spreadAngle = (f / fragCount) * Math.PI * 2 + Utils.random(-0.3, 0.3);
-                                frag.vx = Utils.random(-150, -50) + Math.cos(spreadAngle) * 60;
-                                frag.vy = Math.sin(spreadAngle) * Utils.random(40, 100);
+                                frag.vx = Utils.random(-150, -50) + Math.cos(spreadAngle) * 80;
+                                frag.vy = Math.sin(spreadAngle) * Utils.random(50, 120);
                                 frag.baseY = frag.y;
                                 this.spawner.enemies.push(frag);
                             }

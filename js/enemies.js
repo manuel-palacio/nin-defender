@@ -1778,25 +1778,25 @@ class Boss extends Enemy {
 // ============================================================
 // Phase definitions — each phase has a featured enemy and a score threshold
 const PHASES = [
-    // Phases 1-5: easy — gentle intro, one new enemy type per phase
+    // Phases 1-5: easy — generous gaps, one new enemy type per phase
     { name: 'ASTEROID FIELD',     threshold: 0,    featured: 'asteroid',  color: '#aa7733' },
-    { name: 'CRITTER COLONY',     threshold: 200,  featured: 'ship',      color: '#ff6644' },
-    { name: 'FIREFLY SWARM',      threshold: 500,  featured: 'drone',     color: '#44ff66' },
-    { name: 'JELLYFISH DRIFT',    threshold: 900,  featured: 'mine',      color: '#ff88cc' },
-    { name: 'ARACHNID SECTOR',    threshold: 1400, featured: 'spider',    color: '#66ff22' },
+    { name: 'CRITTER COLONY',     threshold: 400,  featured: 'ship',      color: '#ff6644' },
+    { name: 'FIREFLY SWARM',      threshold: 1000, featured: 'drone',     color: '#44ff66' },
+    { name: 'JELLYFISH DRIFT',    threshold: 1800, featured: 'mine',      color: '#ff88cc' },
+    { name: 'ARACHNID SECTOR',    threshold: 2800, featured: 'spider',    color: '#66ff22' },
     // Phases 6-10: difficulty ramps up
-    { name: 'GHOST NEBULA',       threshold: 2000, featured: 'ghost',     color: '#bb66ff' },
-    { name: 'OCTOPUS DEN',        threshold: 2800, featured: 'bomber',    color: '#cc44ff' },
-    { name: 'CHAMELEON VOID',     threshold: 3800, featured: 'stealth',   color: '#00cccc' },
-    { name: 'DEVIL\'S DOMAIN',    threshold: 5000, featured: 'devil',     color: '#ff4400' },
-    { name: 'TOTAL CHAOS',        threshold: 6500, featured: 'all',       color: '#ff3366' }
+    { name: 'GHOST NEBULA',       threshold: 4000, featured: 'ghost',     color: '#bb66ff' },
+    { name: 'OCTOPUS DEN',        threshold: 5500, featured: 'bomber',    color: '#cc44ff' },
+    { name: 'CHAMELEON VOID',     threshold: 7500, featured: 'stealth',   color: '#00cccc' },
+    { name: 'DEVIL\'S DOMAIN',    threshold: 10000, featured: 'devil',    color: '#ff4400' },
+    { name: 'TOTAL CHAOS',        threshold: 13000, featured: 'all',      color: '#ff3366' }
 ];
 
 class EnemySpawner {
     constructor(assets) {
         this.assets = assets || {};
         this.timer = 0;
-        this.baseInterval = 1.8;
+        this.baseInterval = 2.2;
         this.enemies = [];
         this.currentPhase = 0;
         this.phaseAnnouncedAt = -1; // score when last announcement was shown
@@ -1823,12 +1823,12 @@ class EnemySpawner {
         // Gentler difficulty curve: slow ramp in early phases, steeper after phase 5
         let interval;
         if (phase <= 4) {
-            // Easy phases: 1.8s down to ~1.2s (very gentle)
-            interval = Math.max(1.2, this.baseInterval - phase * 0.12);
+            // Easy phases: 2.2s down to ~1.5s (very gentle)
+            interval = Math.max(1.5, this.baseInterval - phase * 0.1);
         } else {
-            // Hard phases: accelerate from 1.1s down to 0.35s
+            // Hard phases: accelerate from 1.3s down to 0.5s
             const hardPhase = phase - 5;
-            interval = Math.max(0.35, 1.1 - hardPhase * 0.15);
+            interval = Math.max(0.5, 1.3 - hardPhase * 0.16);
         }
         const largeTier = phase >= 5 ? 0.2 : 0;
 
@@ -1923,14 +1923,14 @@ class EnemySpawner {
     spawnMixed(score, canvasW, canvasH, largeTier) {
         // Build pool of available types — matches phase thresholds
         const pool = ['asteroid'];
-        if (score >= 200)  pool.push('ship');
-        if (score >= 500)  pool.push('drone');
-        if (score >= 900)  pool.push('mine');
-        if (score >= 1400) pool.push('spider');
-        if (score >= 2000) pool.push('ghost');
-        if (score >= 2800) pool.push('bomber');
-        if (score >= 3800) pool.push('stealth');
-        if (score >= 5000) pool.push('devil');
+        if (score >= 400)   pool.push('ship');
+        if (score >= 1000)  pool.push('drone');
+        if (score >= 1800)  pool.push('mine');
+        if (score >= 2800)  pool.push('spider');
+        if (score >= 4000)  pool.push('ghost');
+        if (score >= 5500)  pool.push('bomber');
+        if (score >= 7500)  pool.push('stealth');
+        if (score >= 10000) pool.push('devil');
 
         const pick = pool[Utils.randomInt(0, pool.length - 1)];
         this.spawnByType(pick, canvasW, canvasH, largeTier);

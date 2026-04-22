@@ -11,11 +11,11 @@ class Player {
         this.width = 40;
         this.height = 30;
         this.radius = 18;       // collision radius
-        this.speed = 320;
+        this.speed = 420;
         this.vx = 0;
         this.vy = 0;
-        this.accel = 1200;
-        this.friction = 0.88;
+        this.accel = 1800;
+        this.friction = 0.90;
 
         // Combat
         this.lives = 6;
@@ -145,7 +145,7 @@ class Player {
         this.baseDamage = 1 + dmgLevel * 0.5;        // 1 → 3.5 at max
         this.baseFireRate = 0.18 - frLevel * 0.015;   // 0.18 → 0.105 at max
         this.fireRate = this.baseFireRate;
-        this.speed = 320 + spdLevel * 30;             // 320 → 470 at max
+        this.speed = 420 + spdLevel * 30;             // 420 → 570 at max
         this.maxBombs = 2 + bmbLevel;                 // 2 → 7 at max
     }
 
