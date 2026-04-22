@@ -153,6 +153,15 @@
             }
         });
 
+        // Click anywhere on menu to start music (desktop)
+        canvas.addEventListener('click', () => {
+            if (game.state === STATE.MENU && !game.menuMusicStarted) {
+                game.menuMusicStarted = true;
+                game.menuMusic.currentTime = 0;
+                game.menuMusic.play().catch(() => {});
+            }
+        });
+
         // Shield & Bomb touch buttons
         const shieldBtn = document.getElementById('shieldBtn');
         const bombBtn = document.getElementById('bombBtn');

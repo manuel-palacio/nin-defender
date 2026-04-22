@@ -57,8 +57,8 @@ class Player {
         this.bombCooldown = 0;
 
         // Scrap & weapon upgrades (persistent via localStorage)
-        this.scrap = parseInt(localStorage.getItem('galacticDefenderScrap') || '0', 10);
-        this.upgrades = JSON.parse(localStorage.getItem('galacticDefenderUpgrades') || '{}');
+        this.scrap = parseInt(localStorage.getItem('ninDefenderScrap') || '0', 10);
+        this.upgrades = JSON.parse(localStorage.getItem('ninDefenderUpgrades') || '{}');
         this.upgrades.damage   = this.upgrades.damage   || 0; // 0-5 levels
         this.upgrades.fireRate = this.upgrades.fireRate || 0;
         this.upgrades.speed    = this.upgrades.speed    || 0;
@@ -74,7 +74,7 @@ class Player {
             'CYAN', 'CRIMSON', 'EMERALD', 'AMBER',
             'MAGENTA', 'COBALT', 'GHOST WHITE'
         ];
-        this.trailIndex = parseInt(localStorage.getItem('galacticDefenderTrail') || '0', 10);
+        this.trailIndex = parseInt(localStorage.getItem('ninDefenderTrail') || '0', 10);
         this.trailColor = this.trailColors[this.trailIndex];
 
         // Combo system (tracked here for score integration)
@@ -151,7 +151,7 @@ class Player {
 
     addScrap(amount) {
         this.scrap += amount;
-        localStorage.setItem('galacticDefenderScrap', this.scrap.toString());
+        localStorage.setItem('ninDefenderScrap', this.scrap.toString());
     }
 
     buyUpgrade(type) {
@@ -160,8 +160,8 @@ class Player {
         if (this.scrap < cost || this.upgrades[type] >= 5) return false;
         this.scrap -= cost;
         this.upgrades[type]++;
-        localStorage.setItem('galacticDefenderScrap', this.scrap.toString());
-        localStorage.setItem('galacticDefenderUpgrades', JSON.stringify(this.upgrades));
+        localStorage.setItem('ninDefenderScrap', this.scrap.toString());
+        localStorage.setItem('ninDefenderUpgrades', JSON.stringify(this.upgrades));
         this.applyUpgrades();
         return true;
     }
@@ -174,7 +174,7 @@ class Player {
     cycleTrail() {
         this.trailIndex = (this.trailIndex + 1) % this.trailColors.length;
         this.trailColor = this.trailColors[this.trailIndex];
-        localStorage.setItem('galacticDefenderTrail', this.trailIndex.toString());
+        localStorage.setItem('ninDefenderTrail', this.trailIndex.toString());
     }
 
     activateBomb(audio, particles, enemies) {

@@ -1,8 +1,8 @@
-# GALACTIC DEFENDER
+# NIN DEFENDER
 
-A space shooter game built with HTML5 Canvas and vanilla JavaScript. No frameworks, no dependencies — just pure browser tech.
+A Nine Inch Nails-themed space shooter built with HTML5 Canvas and vanilla JavaScript. No frameworks, no dependencies — just pure browser tech.
 
-**Play now:** [galactic-defender.fly.dev](https://galactic-defender.fly.dev/)
+**Play now:** [nin-defender.fly.dev](https://nin-defender.fly.dev/)
 
 ## Controls
 
@@ -20,34 +20,36 @@ Mobile: virtual joystick + fire/shield/bomb touch buttons (landscape only).
 ## Features
 
 ### Enemies
-9 enemy types with unique behaviors and Canvas-drawn visuals:
-- **Asteroids** — textured with craters and ridges, big ones split into fragments, some release spiders
-- **Enemy Ships** — track player position and shoot back (2 tiers with Midjourney sprite support)
-- **Drones** — fast sine-wave swarms of 3-5
-- **Spider Drones** — animated legs, mandibles, multiple eyes, shoot green web projectiles
-- **Bombers** — slow and heavy, drop 3-way spread bombs
-- **Space Mines** — drift slowly, detonate in a ring of projectiles when you get close
-- **Stealth Fighters** — cloak in/out of visibility, zigzag movement
+9 creature-themed enemy types with unique behaviors and Canvas-drawn visuals:
+- **Asteroids** — textured with craters and ridges, big ones split into fragments
+- **Alien Critters** — bug-like creatures with antennae and scuttling legs
+- **Space Fireflies** — bioluminescent swarm insects with fluttering wings
+- **Space Jellyfish** — translucent bell domes with flowing tentacles, sting on proximity
+- **Spider Drones** — animated legs, mandibles, multiple eyes, shoot web projectiles
 - **Alien Ghosts** — translucent, teleport to new positions
+- **Space Octopus** — tentacled aliens that drop ink bombs
+- **Space Chameleons** — color-shifting lizards that cloak in/out of visibility
 - **Alien Devils** — fiery with horns, charge at player, shoot fireballs
 
 ### Phase System
-8 progressive difficulty phases, each featuring a dominant enemy type:
-1. Asteroid Field (0+)
-2. Drone Swarm (300+)
-3. Arachnid Sector (700+)
-4. Ghost Nebula (1200+)
-5. Bomber Wing (1800+)
-6. Stealth Zone (2500+)
-7. Devil's Domain (3500+)
-8. Total Chaos (5000+)
+10 progressive difficulty phases (1-5 easy, 6-10 hard):
+1. Asteroid Field
+2. Critter Colony
+3. Firefly Swarm
+4. Jellyfish Drift
+5. Arachnid Sector
+6. Ghost Nebula
+7. Octopus Den
+8. Chameleon Void
+9. Devil's Domain
+10. Total Chaos
 
-A boss spawns at each phase transition with cycling attack patterns (aimed shots, spiral rings, barrages).
+A boss spawns at each phase transition — early bosses are simple (1-2 attack patterns, low HP), later bosses get progressively harder with all 3 patterns.
 
 ### Environment
 - 5 procedurally generated celestial bodies: Moon, Mars, Gas Giant, Ice Planet, Ringed Planet
 - 3-layer parallax starfield
-- Environmental hazards: solar flares, black holes, asteroid belts
+- Environmental hazards: solar flares, black holes, asteroid belts (phase 3+)
 
 ### Progression
 - **Combo system** — kill streaks multiply score (x2 through x5)
@@ -57,20 +59,22 @@ A boss spawns at each phase transition with cycling attack patterns (aimed shots
 - **Local leaderboard** — top 10 scores
 
 ### Audio
-- Procedural sound effects via Web Audio API (laser, explosions, power-ups)
-- Dark ambient background music: bass drone, pulsing pad, slow dark arpeggio, metallic industrial hits
+- NIN MP3 soundtrack — randomly cycles tracks during gameplay
+- Menu/game-over music: separate NIN track
+- Procedural SFX via Web Audio API (explosions, power-ups, enemy hits)
 - Music intensity scales with phase progression
 
 ### Visuals
-- Midjourney-generated sprite assets with transparent backgrounds
-- Canvas fallback rendering for all sprites (game works without images)
+- Industrial NIN aesthetic — dark blacks, blood reds, scan line effects
+- NIN lyrics displayed as in-game quotes
+- Canvas-drawn creatures with unique animations
 - Screen shake, particle explosions, engine trails, shield effects
 
 ## Tech Stack
 
 - HTML5 Canvas
 - Vanilla JavaScript (no build step)
-- Web Audio API (synthesized SFX + procedural music)
+- Web Audio API (synthesized SFX)
 - Nginx Alpine (Docker)
 - Fly.io (deployment)
 
@@ -84,23 +88,14 @@ python3 -m http.server 8080
 Or with Docker:
 
 ```bash
-docker build -t galactic-defender .
-docker run -p 8080:8080 galactic-defender
+docker build -t nin-defender .
+docker run -p 8080:8080 nin-defender
 ```
 
 ## Deploy
 
 ```bash
 fly deploy
-```
-
-## Asset Generation
-
-Ship and powerup sprites were generated with Midjourney, then processed with ImageMagick to remove black backgrounds:
-
-```bash
-# Example: remove black background with fuzz tolerance
-magick input.png -fuzz 12% -transparent black output.png
 ```
 
 NIN lyrics from: Head Like a Hole, Starfuckers Inc., The Big Come Down, Please, The Collector, Every Day Is Exactly The Same, Hurt.

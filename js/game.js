@@ -83,7 +83,7 @@ class Game {
         this.bossSpawnedForPhase = -1;
 
         // Leaderboard
-        this.leaderboard = JSON.parse(localStorage.getItem('galacticDefenderLeaderboard') || '[]');
+        this.leaderboard = JSON.parse(localStorage.getItem('ninDefenderLeaderboard') || '[]');
 
         // Bomb flash
         this.bombFlashTimer = 0;
@@ -91,7 +91,7 @@ class Game {
         // State
         this.state = STATE.MENU;
         this.score = 0;
-        this.highScore = parseInt(localStorage.getItem('galacticDefenderHigh') || '0', 10);
+        this.highScore = parseInt(localStorage.getItem('ninDefenderHigh') || '0', 10);
         this.time = 0;
         this.powerupTimer = 0;
 
@@ -172,7 +172,7 @@ class Game {
         this.state = STATE.GAME_OVER;
         if (this.score > this.highScore) {
             this.highScore = this.score;
-            localStorage.setItem('galacticDefenderHigh', this.highScore.toString());
+            localStorage.setItem('ninDefenderHigh', this.highScore.toString());
         }
         // Save scrap earned and update leaderboard
         this.player.addScrap(0); // ensure saved
@@ -188,7 +188,7 @@ class Game {
         this.leaderboard.push({ score, date: new Date().toLocaleDateString() });
         this.leaderboard.sort((a, b) => b.score - a.score);
         this.leaderboard = this.leaderboard.slice(0, 10);
-        localStorage.setItem('galacticDefenderLeaderboard', JSON.stringify(this.leaderboard));
+        localStorage.setItem('ninDefenderLeaderboard', JSON.stringify(this.leaderboard));
     }
 
     resize(w, h) {
@@ -207,14 +207,17 @@ class Game {
             }
         }
 
+        // Start menu music on any key if we're on the menu
+        if (this.state === STATE.MENU && !this.menuMusicStarted) {
+            this.menuMusicStarted = true;
+            this.menuMusic.currentTime = 0;
+            this.menuMusic.play().catch(() => {});
+        }
+
         if (code === 'Space') {
             this.audio.init();
             this.audio.resume();
             if (this.state === STATE.MENU) {
-                // Start menu music on first interaction if not already playing
-                if (!this.menuMusicStarted) {
-                    this.menuMusicStarted = true;
-                }
                 this.startGame();
             } else if (this.state === STATE.GAME_OVER) {
                 this.startGame();
@@ -599,7 +602,7 @@ class Game {
         if (this.state === STATE.GAME_OVER)  this.drawGameOver(ctx);
     }
 
-    // ----- HUD -----
+    // ----- HUD ----- (NIN industrial palette)
     drawHUD(ctx) {
         const w = this.canvas.width;
         const h = this.canvas.height;
@@ -608,17 +611,17 @@ class Game {
         // Score — top left
         ctx.font = 'bold 22px Courier New';
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
+        ctx.shadowBlur = 6;
         ctx.fillText(`SCORE: ${this.score}`, 16, 34);
         ctx.font = '14px Courier New';
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = '#555';
         ctx.shadowBlur = 0;
         ctx.fillText(`HI: ${this.highScore}`, 16, 54);
 
         // Scrap counter
-        ctx.fillStyle = '#ffaa00';
+        ctx.fillStyle = '#993300';
         ctx.fillText(`SCRAP: ${this.player.scrap}`, 16, 70);
 
         // Combo display
@@ -626,7 +629,7 @@ class Game {
             const mult = this.player.getComboMultiplier();
             const comboPulse = 0.7 + 0.3 * Math.sin(this.time * 8);
             ctx.font = `bold ${16 + mult * 2}px Courier New`;
-            ctx.fillStyle = mult >= 4 ? '#ff3366' : mult >= 3 ? '#ffaa00' : '#ffdd00';
+            ctx.fillStyle = mult >= 4 ? '#ff2200' : mult >= 3 ? '#cc0000' : '#993300';
             ctx.shadowColor = ctx.fillStyle;
             ctx.shadowBlur = 8 * comboPulse;
             ctx.fillText(`COMBO x${mult} (${this.player.combo})`, 16, 88);
@@ -637,9 +640,9 @@ class Game {
         for (let i = 0; i < this.player.lives; i++) {
             const lx = w - 30 - i * 30;
             const ly = 28;
-            ctx.fillStyle = '#00ffff';
-            ctx.shadowColor = '#00ffff';
-            ctx.shadowBlur = 5;
+            ctx.fillStyle = '#cc0000';
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 4;
             ctx.beginPath();
             ctx.moveTo(lx + 10, ly);
             ctx.lineTo(lx - 5, ly - 7);
@@ -656,39 +659,39 @@ class Game {
         ctx.shadowBlur = 0;
 
         if (this.player.rapidFire) {
-            ctx.fillStyle = POWERUP_TYPES.RAPID_FIRE.color;
+            ctx.fillStyle = '#cc0000';
             ctx.fillText(`RAPID FIRE ${Math.ceil(this.player.rapidFireTimer)}s`, 16, puY);
             puY += 18;
         }
         if (this.player.tripleShot) {
-            ctx.fillStyle = POWERUP_TYPES.TRIPLE_SHOT.color;
+            ctx.fillStyle = '#993300';
             ctx.fillText(`TRIPLE SHOT ${Math.ceil(this.player.tripleShotTimer)}s`, 16, puY);
             puY += 18;
         }
         if (this.player.shield) {
-            ctx.fillStyle = POWERUP_TYPES.SHIELD.color;
+            ctx.fillStyle = '#888';
             ctx.fillText(`SHIELD ${Math.ceil(this.player.shieldTimer)}s`, 16, puY);
             puY += 18;
         }
         if (this.player.activeShield) {
-            ctx.fillStyle = '#00ddff';
+            ctx.fillStyle = '#aaa';
             ctx.fillText(`SHIELD ACTIVE ${Math.ceil(this.player.activeShieldTimer)}s`, 16, puY);
             puY += 18;
         }
 
         // Phase announcement — center screen, fading
         if (this.phaseAnnounceTimer > 0) {
-            const fadeAlpha = Math.min(1, this.phaseAnnounceTimer / 0.5); // fade out in last 0.5s
+            const fadeAlpha = Math.min(1, this.phaseAnnounceTimer / 0.5);
             ctx.save();
             ctx.globalAlpha = fadeAlpha;
             ctx.textAlign = 'center';
             ctx.font = `bold ${Math.min(w * 0.035, 28)}px Courier New`;
-            ctx.fillStyle = this.phaseAnnounceColor;
-            ctx.shadowColor = this.phaseAnnounceColor;
-            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#cc0000';
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 12;
             ctx.fillText(`— ${this.phaseAnnounceName} —`, w / 2, h * 0.15);
             ctx.font = '13px Courier New';
-            ctx.fillStyle = '#aaa';
+            ctx.fillStyle = '#666';
             ctx.shadowBlur = 0;
             ctx.fillText(`PHASE ${this.lastPhase + 1}`, w / 2, h * 0.15 + 25);
             ctx.restore();
@@ -698,12 +701,12 @@ class Game {
         if (this.lastPhase >= 0 && this.phaseAnnounceTimer <= 0) {
             ctx.font = '11px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#555';
+            ctx.fillStyle = '#3a3a3a';
             ctx.shadowBlur = 0;
             ctx.fillText(`PHASE ${this.lastPhase + 1}: ${PHASES[this.lastPhase].name}`, w / 2, 18);
         }
 
-        // NIN quote — bottom center, small, fading (skip on tiny screens)
+        // NIN quote — bottom center, fading
         if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0 && !this.bossActive && h > 350) {
             const fadeIn = Math.min(1, (this.quoteDuration - this.quoteTimer) / 2.0);
             const fadeOut = Math.min(1, this.quoteTimer / 3.0);
@@ -712,7 +715,7 @@ class Game {
             ctx.globalAlpha = alpha;
             ctx.textAlign = 'center';
             ctx.font = `italic ${Math.min(w * 0.025, 18)}px Courier New`;
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = '#d4d4d4';
             ctx.fillText(`"${this.quoteText}"`, w / 2, h * 0.55);
             ctx.restore();
         }
@@ -723,144 +726,156 @@ class Game {
         const chargeY = h - 20;
         if (this.player.shieldRecharging) {
             const frac = 1 - this.player.shieldRechargeTimer / this.player.shieldRechargeDuration;
-            ctx.fillStyle = '#555';
+            ctx.fillStyle = '#444';
             ctx.fillText('SHIELD', 16, chargeY);
-            // Recharge bar
             const barW = 60;
-            ctx.fillStyle = '#333';
+            ctx.fillStyle = '#222';
             ctx.fillRect(75, chargeY - 9, barW, 8);
-            ctx.fillStyle = '#00aaff';
-            ctx.shadowColor = '#00aaff';
-            ctx.shadowBlur = 4;
+            ctx.fillStyle = '#888';
+            ctx.shadowColor = '#888';
+            ctx.shadowBlur = 3;
             ctx.fillRect(75, chargeY - 9, barW * frac, 8);
             ctx.shadowBlur = 0;
         } else {
-            ctx.fillStyle = this.player.shieldCharges > 0 ? '#00ddff' : '#555';
+            ctx.fillStyle = this.player.shieldCharges > 0 ? '#999' : '#444';
             const chargeText = 'E: SHIELD ' + '●'.repeat(this.player.shieldCharges) +
                                '○'.repeat(this.player.maxShieldCharges - this.player.shieldCharges);
             ctx.fillText(chargeText, 16, chargeY);
         }
 
-        // Bomb charges — bottom left, below shield
-        ctx.fillStyle = this.player.bombs > 0 ? '#ff8844' : '#555';
+        // Bomb charges
+        ctx.fillStyle = this.player.bombs > 0 ? '#cc0000' : '#444';
         const bombText = 'Q: BOMB ' + '●'.repeat(this.player.bombs) +
                          '○'.repeat(Math.max(0, this.player.maxBombs - this.player.bombs));
         ctx.fillText(bombText, 16, chargeY - 18);
 
         // Trail color name — bottom right
         ctx.textAlign = 'right';
-        ctx.fillStyle = this.player.trailColor || '#00ffff';
+        ctx.fillStyle = this.player.trailColor || '#cc0000';
         ctx.fillText(`T: TRAIL [${this.player.trailColorNames[this.player.trailIndex]}]`, w - 16, h - 20);
 
         ctx.restore();
     }
 
-    // ----- Menu -----
+    // ----- Menu ----- (NIN industrial)
     drawMenu(ctx) {
         const w = this.canvas.width;
         const h = this.canvas.height;
 
         ctx.save();
 
-        // Background image or darken overlay
+        // Background image or dark overlay
         if (this.assets.splashBg) {
             Utils.drawCover(ctx, this.assets.splashBg, w, h);
-            // Darken slightly so text is readable
-            ctx.fillStyle = 'rgba(10, 10, 31, 0.45)';
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.6)';
             ctx.fillRect(0, 0, w, h);
         } else {
-            ctx.fillStyle = 'rgba(10, 10, 31, 0.6)';
+            ctx.fillStyle = 'rgba(10, 10, 10, 0.75)';
             ctx.fillRect(0, 0, w, h);
         }
 
-        // Title
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 20;
-        ctx.font = `bold ${Math.min(w * 0.07, 56)}px Courier New`;
-        ctx.fillText('GALACTIC DEFENDER', w / 2, h * 0.3);
+        // Subtle scan lines effect
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        for (let y = 0; y < h; y += 4) {
+            ctx.fillRect(0, y, w, 2);
+        }
 
-        // Subtitle line
+        // Title — NIN DEFENDER in harsh red
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
+        ctx.shadowBlur = 25;
+        ctx.font = `bold ${Math.min(w * 0.08, 64)}px Courier New`;
+        ctx.fillText('NIN DEFENDER', w / 2, h * 0.3);
+        // Double-strike for glow intensity
+        ctx.shadowBlur = 40;
+        ctx.globalAlpha = 0.3;
+        ctx.fillText('NIN DEFENDER', w / 2, h * 0.3);
+        ctx.globalAlpha = 1;
+
+        // Subtitle
         ctx.shadowBlur = 0;
-        ctx.font = `${Math.min(w * 0.025, 16)}px Courier New`;
-        ctx.fillStyle = '#ff00ff';
-        ctx.fillText('A SPACE SHOOTER ADVENTURE', w / 2, h * 0.3 + 35);
+        ctx.font = `${Math.min(w * 0.02, 13)}px Courier New`;
+        ctx.fillStyle = '#555';
+        ctx.letterSpacing = '4px';
+        ctx.fillText('NOTHING CAN STOP ME NOW', w / 2, h * 0.3 + 35);
 
         // Pulsing start prompt
-        const pulse = 0.5 + 0.5 * Math.sin(this.menuTime * 3);
+        const pulse = 0.4 + 0.6 * Math.sin(this.menuTime * 2.5);
         ctx.globalAlpha = pulse;
-        ctx.font = `bold ${Math.min(w * 0.03, 20)}px Courier New`;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('PRESS SPACE TO START', w / 2, h * 0.55);
+        ctx.font = `bold ${Math.min(w * 0.025, 18)}px Courier New`;
+        ctx.fillStyle = '#cc0000';
+        ctx.fillText('[ PRESS SPACE ]', w / 2, h * 0.5);
         ctx.globalAlpha = 1;
 
         // Mobile hint
         if ('ontouchstart' in window) {
-            ctx.font = `${Math.min(w * 0.025, 14)}px Courier New`;
-            ctx.fillStyle = '#888';
-            ctx.fillText('TAP ANYWHERE TO START', w / 2, h * 0.62);
+            ctx.font = `${Math.min(w * 0.02, 13)}px Courier New`;
+            ctx.fillStyle = '#444';
+            ctx.fillText('TAP ANYWHERE TO START', w / 2, h * 0.57);
         }
 
-        // Controls — clear instructions box
-        ctx.font = 'bold 14px Courier New';
-        ctx.fillStyle = '#888';
-        const cy = h * 0.65;
+        // Controls
+        ctx.font = 'bold 13px Courier New';
+        ctx.fillStyle = '#555';
+        const cy = h * 0.62;
         ctx.fillText('— CONTROLS —', w / 2, cy);
-        ctx.font = '13px Courier New';
-        ctx.fillStyle = '#666';
+        ctx.font = '12px Courier New';
         const controls = [
             ['WASD / ARROWS', 'Move ship'],
             ['SPACE (hold)',  'Fire weapons'],
-            ['E',             'Shield (3 charges, recharges)'],
-            ['Q',             'Screen-clearing bomb'],
-            ['T',             'Cycle trail color'],
-            ['P / ESC',       'Pause game']
+            ['E',             'Shield (3 charges)'],
+            ['Q',             'Screen bomb'],
+            ['T',             'Cycle trail'],
+            ['P / ESC',       'Pause']
         ];
         controls.forEach(([key, desc], i) => {
-            const y = cy + 22 + i * 20;
+            const y = cy + 20 + i * 18;
             ctx.textAlign = 'right';
-            ctx.fillStyle = '#00ffff';
+            ctx.fillStyle = '#993300';
             ctx.fillText(key, w / 2 - 10, y);
             ctx.textAlign = 'left';
-            ctx.fillStyle = '#666';
+            ctx.fillStyle = '#444';
             ctx.fillText(desc, w / 2 + 10, y);
         });
         ctx.textAlign = 'center';
 
         // High score
         if (this.highScore > 0) {
-            ctx.font = 'bold 16px Courier New';
-            ctx.fillStyle = '#ffdd00';
-            ctx.shadowColor = '#ffdd00';
-            ctx.shadowBlur = 6;
-            ctx.fillText(`HIGH SCORE: ${this.highScore}`, w / 2, h * 0.9);
+            ctx.font = 'bold 14px Courier New';
+            ctx.fillStyle = '#666';
+            ctx.shadowBlur = 0;
+            ctx.fillText(`HIGH SCORE: ${this.highScore}`, w / 2, h * 0.92);
         }
 
         ctx.restore();
     }
 
-    // ----- Pause overlay -----
+    // ----- Pause overlay ----- (NIN industrial)
     drawPause(ctx) {
         const w = this.canvas.width;
         const h = this.canvas.height;
         ctx.save();
-        ctx.fillStyle = 'rgba(10, 10, 31, 0.7)';
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.8)';
         ctx.fillRect(0, 0, w, h);
+        // Scan lines
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 2);
+
         ctx.textAlign = 'center';
         ctx.font = 'bold 48px Courier New';
-        ctx.fillStyle = '#ff00ff';
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
+        ctx.shadowBlur = 20;
         ctx.fillText('PAUSED', w / 2, h / 2 - 10);
         ctx.shadowBlur = 0;
-        ctx.font = '18px Courier New';
-        ctx.fillStyle = '#aaa';
+        ctx.font = '16px Courier New';
+        ctx.fillStyle = '#555';
         ctx.fillText('Press P or ESC to resume', w / 2, h / 2 + 30);
         ctx.restore();
     }
 
-    // ----- Game Over -----
+    // ----- Game Over ----- (NIN industrial)
     drawGameOver(ctx) {
         const w = this.canvas.width;
         const h = this.canvas.height;
@@ -868,60 +883,65 @@ class Game {
 
         if (this.assets.gameoverBg) {
             Utils.drawCover(ctx, this.assets.gameoverBg, w, h);
-            ctx.fillStyle = 'rgba(10, 10, 31, 0.5)';
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.65)';
             ctx.fillRect(0, 0, w, h);
         } else {
-            ctx.fillStyle = 'rgba(10, 10, 31, 0.75)';
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.85)';
             ctx.fillRect(0, 0, w, h);
         }
+        // Scan lines
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 2);
+
         ctx.textAlign = 'center';
 
+        // Glitchy GAME OVER — double render with offset for distortion
         ctx.font = `bold ${Math.min(w * 0.06, 48)}px Courier New`;
-        ctx.fillStyle = '#ff3366';
-        ctx.shadowColor = '#ff3366';
-        ctx.shadowBlur = 15;
+        const glitch = Math.sin(this.menuTime * 7) * 2;
+        ctx.fillStyle = 'rgba(204, 0, 0, 0.3)';
+        ctx.fillText('GAME OVER', w / 2 + glitch, h * 0.35 - 1);
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
+        ctx.shadowBlur = 20;
         ctx.fillText('GAME OVER', w / 2, h * 0.35);
 
         ctx.shadowBlur = 0;
         ctx.font = 'bold 26px Courier New';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#d4d4d4';
         ctx.fillText(`SCORE: ${this.score}`, w / 2, h * 0.48);
 
-        ctx.font = '18px Courier New';
-        ctx.fillStyle = '#ffdd00';
-        ctx.shadowColor = '#ffdd00';
-        ctx.shadowBlur = 6;
+        ctx.font = '16px Courier New';
+        ctx.fillStyle = '#666';
         ctx.fillText(`HIGH SCORE: ${this.highScore}`, w / 2, h * 0.56);
 
         // Stats
         ctx.font = '14px Courier New';
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#ffaa00';
+        ctx.fillStyle = '#555';
         ctx.fillText(`SCRAP EARNED: ${this.player.scrap}`, w / 2, h * 0.62);
         if (this.player.maxCombo >= 3) {
-            ctx.fillStyle = '#ff8844';
+            ctx.fillStyle = '#993300';
             ctx.fillText(`MAX COMBO: x${this.player.maxCombo}`, w / 2, h * 0.66);
         }
 
-        // Leaderboard (compact)
+        // Leaderboard
         if (this.leaderboard.length > 0) {
             ctx.font = 'bold 12px Courier New';
-            ctx.fillStyle = '#888';
+            ctx.fillStyle = '#444';
             ctx.fillText('— TOP SCORES —', w / 2, h * 0.73);
             ctx.font = '11px Courier New';
             const maxShow = Math.min(5, this.leaderboard.length);
             for (let i = 0; i < maxShow; i++) {
                 const entry = this.leaderboard[i];
-                ctx.fillStyle = i === 0 ? '#ffdd00' : '#666';
+                ctx.fillStyle = i === 0 ? '#cc0000' : '#444';
                 ctx.fillText(`${i + 1}. ${entry.score}`, w / 2, h * 0.73 + 16 + i * 14);
             }
         }
 
-        const pulse = 0.5 + 0.5 * Math.sin(this.menuTime * 3);
+        const pulse = 0.4 + 0.6 * Math.sin(this.menuTime * 2.5);
         ctx.globalAlpha = pulse;
-        ctx.font = 'bold 18px Courier New';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('PRESS SPACE TO RESTART', w / 2, h * 0.93);
+        ctx.font = 'bold 16px Courier New';
+        ctx.fillStyle = '#cc0000';
+        ctx.fillText('[ PRESS SPACE ]', w / 2, h * 0.93);
         ctx.globalAlpha = 1;
 
         ctx.restore();

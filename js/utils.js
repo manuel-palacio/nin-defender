@@ -110,6 +110,10 @@ class AudioManager {
             this.masterGain = this.ctx.createGain();
             this.masterGain.gain.value = 0.5;
             this.masterGain.connect(this.ctx.destination);
+            // Separate SFX bus — audible but quieter than music
+            this.sfxGain = this.ctx.createGain();
+            this.sfxGain.gain.value = 0.6;
+            this.sfxGain.connect(this.masterGain);
             this.initialized = true;
         } catch (e) {
             console.warn('Web Audio API not available');
@@ -156,10 +160,10 @@ class AudioManager {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(120, now);
         osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
-        oscGain.gain.setValueAtTime(0.5, now);
+        oscGain.gain.setValueAtTime(1.0, now);
         oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
         osc.connect(oscGain);
-        oscGain.connect(this.masterGain);
+        oscGain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + 0.3);
 
@@ -169,7 +173,6 @@ class AudioManager {
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            // Shaped noise — sharp attack, rumbling tail
             const t = i / bufferSize;
             const env = t < 0.05 ? t / 0.05 : Math.pow(1 - t, 2);
             data[i] = (Math.random() * 2 - 1) * env;
@@ -177,7 +180,7 @@ class AudioManager {
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
         const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.4, now);
+        noiseGain.gain.setValueAtTime(0.8, now);
         noiseGain.gain.exponentialRampToValueAtTime(0.001, now + len);
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
@@ -187,7 +190,7 @@ class AudioManager {
         filter.Q.linearRampToValueAtTime(0.5, now + len * 0.5);
         source.connect(filter);
         filter.connect(noiseGain);
-        noiseGain.connect(this.masterGain);
+        noiseGain.connect(this.sfxGain);
         source.start(now);
 
         // Layer 3: Mid-frequency crunch (delayed slightly)
@@ -197,10 +200,10 @@ class AudioManager {
         osc2.frequency.setValueAtTime(200, now + 0.02);
         osc2.frequency.exponentialRampToValueAtTime(40, now + 0.25);
         osc2Gain.gain.setValueAtTime(0, now);
-        osc2Gain.gain.linearRampToValueAtTime(0.2, now + 0.02);
+        osc2Gain.gain.linearRampToValueAtTime(0.4, now + 0.02);
         osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         osc2.connect(osc2Gain);
-        osc2Gain.connect(this.masterGain);
+        osc2Gain.connect(this.sfxGain);
         osc2.start(now);
         osc2.stop(now + 0.25);
     }
@@ -213,10 +216,10 @@ class AudioManager {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(150, now);
         osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
-        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.setValueAtTime(0.5, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + 0.15);
     }
@@ -232,10 +235,10 @@ class AudioManager {
             const t = now + i * 0.06;
             osc.frequency.setValueAtTime(freq, t);
             gain.gain.setValueAtTime(0, t);
-            gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
+            gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
             gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
             osc.connect(gain);
-            gain.connect(this.masterGain);
+            gain.connect(this.sfxGain);
             osc.start(t);
             osc.stop(t + 0.15);
         });
@@ -253,11 +256,11 @@ class AudioManager {
         osc.frequency.exponentialRampToValueAtTime(55, now + 1.5);
         osc2.frequency.setValueAtTime(438, now);
         osc2.frequency.exponentialRampToValueAtTime(54, now + 1.5);
-        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.setValueAtTime(0.3, now);
         gain.gain.linearRampToValueAtTime(0, now + 1.5);
         osc.connect(gain);
         osc2.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc2.start(now);
         osc.stop(now + 1.5);
@@ -272,10 +275,10 @@ class AudioManager {
         osc.type = 'square';
         osc.frequency.setValueAtTime(180, now);
         osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
-        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.setValueAtTime(0.4, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + 0.25);
     }
@@ -291,7 +294,7 @@ class AudioManager {
         gain.gain.setValueAtTime(0.06, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.sfxGain);
         osc.start(now);
         osc.stop(now + 0.1);
     }
@@ -448,34 +451,34 @@ class AssetLoader {
         const w = canvas.width;
         const h = canvas.height;
 
-        // Background
-        ctx.fillStyle = '#0a0a1f';
+        // Background — pure black
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, w, h);
 
-        // Title
+        // Title — blood red
         ctx.textAlign = 'center';
         ctx.font = `bold ${Math.min(w * 0.05, 36)}px Courier New`;
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
         ctx.shadowBlur = 15;
-        ctx.fillText('GALACTIC DEFENDER', w / 2, h * 0.4);
+        ctx.fillText('NIN DEFENDER', w / 2, h * 0.4);
 
         // Loading text
         ctx.shadowBlur = 0;
-        ctx.font = '14px Courier New';
-        ctx.fillStyle = '#888';
-        ctx.fillText('LOADING ASSETS...', w / 2, h * 0.52);
+        ctx.font = '13px Courier New';
+        ctx.fillStyle = '#444';
+        ctx.fillText('LOADING...', w / 2, h * 0.52);
 
-        // Progress bar
+        // Progress bar — red fill on dark grey
         const barW = Math.min(300, w * 0.6);
-        const barH = 6;
+        const barH = 4;
         const bx = (w - barW) / 2;
         const by = h * 0.57;
-        ctx.fillStyle = '#222';
+        ctx.fillStyle = '#1a1a1a';
         ctx.fillRect(bx, by, barW, barH);
-        ctx.fillStyle = '#00ffff';
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#cc0000';
+        ctx.shadowColor = '#cc0000';
+        ctx.shadowBlur = 6;
         ctx.fillRect(bx, by, barW * progress, barH);
         ctx.shadowBlur = 0;
     }
