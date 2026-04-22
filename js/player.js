@@ -128,6 +128,23 @@ class Player {
         this.applyUpgrades();
     }
 
+    getActivePowerUpCount() {
+        let count = 0;
+        if (this.rapidFire) count++;
+        if (this.tripleShot) count++;
+        if (this.shield) count++;
+        if (this.deathRay) count++;
+        if (this.ricochet) count++;
+        return count;
+    }
+
+    getPowerComboMultiplier() {
+        const count = this.getActivePowerUpCount();
+        if (count >= 3) return 3.0;
+        if (count >= 2) return 2.0;
+        return 1.0;
+    }
+
     applyPowerUp(type) {
         switch (type) {
             case 'RAPID_FIRE':

@@ -457,13 +457,12 @@ class Game {
                 if (Utils.circleCollision(bullet.x, bullet.y, bullet.radius, e.x, e.y, e.radius)) {
                     bullet.active = false;
                     const killed = e.takeDamage(bullet.damage);
-                    console.log('HIT:', e.type, 'dmg:', bullet.damage, 'hp:', e.hp, 'killed:', killed);
                     if (killed) {
                         e.active = false;
                         // Combo + score
                         this.player.registerKill();
-                        const multiplier = this.player.getComboMultiplier();
-                        this.score += e.points * multiplier;
+                        const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
+                        this.score += Math.floor(e.points * multiplier);
                         // Scrap drops (1-3 per kill)
                         this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
 
@@ -489,7 +488,7 @@ class Game {
                             // Only split if not already a tiny fragment
                             if (e.radius > 10) {
                                 const fragCount = e.radius > 20 ? Utils.randomInt(3, 5) : Utils.randomInt(2, 3);
-                                console.log('SPLIT: asteroid r=' + e.radius + ' into ' + fragCount + ' frags at', e.x, e.y);
+
                                 for (let f = 0; f < fragCount; f++) {
                                     const angle = ((f + 0.5) / fragCount) * Math.PI * 2;
                                     const fragR = e.radius * Utils.random(0.4, 0.6);
@@ -556,8 +555,8 @@ class Game {
                 if (e.x > beamX - e.radius && Math.abs(e.y - beamY) < halfH + e.radius) {
                     e.active = false;
                     this.player.registerKill();
-                    const multiplier = this.player.getComboMultiplier();
-                    this.score += e.points * multiplier;
+                    const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
+                    this.score += Math.floor(e.points * multiplier);
                     this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
                     // Big explosion for every kill
                     this.particles.createColorExplosion(e.x, e.y,
@@ -762,6 +761,19 @@ class Game {
             ctx.fillText(`RICOCHET ${Math.ceil(this.player.ricochetTimer)}s`, 16, puY);
             puY += 18;
         }
+        // Power combo indicator
+        const puCount = this.player.getActivePowerUpCount();
+        if (puCount >= 2) {
+            const comboMul = this.player.getPowerComboMultiplier();
+            const comboPulse = 0.7 + 0.3 * Math.sin(this.time * 6);
+            ctx.font = `bold ${14 + puCount * 2}px Courier New`;
+            ctx.fillStyle = puCount >= 3 ? '#ff2200' : '#ff8800';
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.shadowBlur = 10 * comboPulse;
+            ctx.fillText(`POWER COMBO x${comboMul}`, 16, puY);
+            ctx.shadowBlur = 0;
+            puY += 18;
+        }
         if (this.player.deathRay) {
             ctx.fillStyle = '#cc0000';
             ctx.shadowColor = '#cc0000';
@@ -957,9 +969,8 @@ class Game {
 
         // Subtitle
         ctx.shadowBlur = 0;
-        ctx.font = `${Math.min(w * 0.02, 13)}px Courier New`;
-        ctx.fillStyle = '#555';
-        ctx.letterSpacing = '4px';
+        ctx.font = `${Math.min(w * 0.025, 16)}px Courier New`;
+        ctx.fillStyle = '#999';
         ctx.fillText('NOTHING CAN STOP ME NOW', w / 2, h * 0.3 + 35);
 
         // Pulsing start prompt
