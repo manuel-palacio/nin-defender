@@ -295,7 +295,27 @@ class Game {
             const phaseInfo = PHASES[currentPhase];
             this.phaseAnnounceName = phaseInfo.name;
             this.phaseAnnounceColor = phaseInfo.color;
-            this.phaseAnnounceTimer = 3.0;
+            this.phaseAnnounceTimer = 4.0;
+
+            // Clear all non-boss enemies for a clean phase transition
+            if (currentPhase > 0) {
+                for (let i = this.spawner.enemies.length - 1; i >= 0; i--) {
+                    const e = this.spawner.enemies[i];
+                    if (e.type !== 'boss') {
+                        // Explosion effect on each cleared enemy
+                        this.particles.createColorExplosion(e.x, e.y,
+                            ['#ffffff', '#aaaaaa'], 8, 150, 0.4, 3);
+                        this.spawner.enemies.splice(i, 1);
+                    }
+                }
+                // Brief spawn pause
+                this.spawner.timer = 3.0;
+            }
+
+            // New phase — switch to a new random track
+            if (this.music && this.music.playing) {
+                this.music._playRandom();
+            }
 
             // Spawn boss at each phase transition (except phase 0)
             if (currentPhase > 0 && this.bossSpawnedForPhase < currentPhase) {
@@ -367,7 +387,7 @@ class Game {
         this.powerupTimer -= dt;
         if (this.powerupTimer <= 0) {
             this.spawnPowerUp();
-            this.powerupTimer = Utils.random(10, 20);
+            this.powerupTimer = Utils.random(8, 15);
         }
         for (let i = this.powerups.length - 1; i >= 0; i--) {
             this.powerups[i].update(dt, this.canvas.width);
@@ -382,7 +402,7 @@ class Game {
         }
         this.quoteInterval -= dt;
         if (this.quoteInterval <= 0) {
-            this.quoteInterval = Utils.random(8, 16);
+            this.quoteInterval = Utils.random(25, 45);
             this.showRandomQuote();
         }
 
@@ -399,11 +419,18 @@ class Game {
         this.usedQuotes.push(idx);
         this.quoteText = NIN_QUOTES[idx];
         this.quoteTimer = this.quoteDuration;
+        this._quoteWordPositions = null; // regenerate positions
     }
 
     spawnPowerUp() {
         const pu = new PowerUp();
-        const type = POWERUP_KEYS[Utils.randomInt(0, POWERUP_KEYS.length - 1)];
+        // Weighted selection — extra lives more likely when low on lives
+        let type;
+        if (this.player.lives <= 3 && Math.random() < 0.35) {
+            type = 'EXTRA_LIFE';
+        } else {
+            type = POWERUP_KEYS[Utils.randomInt(0, POWERUP_KEYS.length - 1)];
+        }
         pu.init(
             this.canvas.width + 20,
             Utils.random(40, this.canvas.height - 40),
@@ -759,25 +786,95 @@ class Game {
 
         // Current phase indicator — top center
         if (this.lastPhase >= 0 && this.phaseAnnounceTimer <= 0) {
-            ctx.font = '11px Courier New';
+            ctx.font = 'bold 13px Courier New';
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#3a3a3a';
+            ctx.fillStyle = '#888';
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 3;
+            ctx.fillText(`PHASE ${this.lastPhase + 1}: ${PHASES[this.lastPhase].name}`, w / 2, 20);
             ctx.shadowBlur = 0;
-            ctx.fillText(`PHASE ${this.lastPhase + 1}: ${PHASES[this.lastPhase].name}`, w / 2, 18);
         }
 
-        // NIN quote — bottom center, fading
+        // NIN quote — words flash one at a time at random positions
         if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0 && !this.bossActive && h > 350) {
-            const fadeIn = Math.min(1, (this.quoteDuration - this.quoteTimer) / 2.0);
-            const fadeOut = Math.min(1, this.quoteTimer / 3.0);
-            const alpha = Math.min(fadeIn, fadeOut) * 0.7;
-            ctx.save();
-            ctx.globalAlpha = alpha;
-            ctx.textAlign = 'center';
-            ctx.font = `italic ${Math.min(w * 0.025, 18)}px Courier New`;
-            ctx.fillStyle = '#d4d4d4';
-            ctx.fillText(`"${this.quoteText}"`, w / 2, h * 0.55);
-            ctx.restore();
+            const elapsed = this.quoteDuration - this.quoteTimer;
+            const words = this.quoteText.split(' ');
+            // Scale word timing so long quotes still fit within ~8 seconds
+            const wordDuration = Math.min(0.9, 7.0 / Math.max(words.length, 1));
+            const totalDuration = words.length * wordDuration + 1.0;
+
+            // Only render during the word sequence
+            if (elapsed < totalDuration) {
+                // Position words near center with slight scatter + cycling color
+                const wordColors = ['#ffdd00', '#ff2200', '#00ff44', '#ff8800', '#00ddff', '#ff00ff', '#ff4488', '#88ff00'];
+                if (!this._quoteWordPositions) {
+                    const centerX = w / 2;
+                    const centerY = h * 0.45;
+                    // Shuffle colors so each word gets a unique one
+                    const shuffled = [...wordColors].sort(() => Math.random() - 0.5);
+                    this._quoteWordPositions = words.map((_, i) => ({
+                        x: centerX + (Math.random() - 0.5) * w * 0.15,
+                        y: centerY + (Math.random() - 0.5) * h * 0.08,
+                        color: shuffled[i % shuffled.length]
+                    }));
+                }
+
+                ctx.save();
+                const fontSize = Math.min(w * 0.06, 48);
+                ctx.textAlign = 'center';
+
+                for (let i = 0; i < words.length; i++) {
+                    const wordStart = i * wordDuration;
+                    const wordTime = elapsed - wordStart;
+                    if (wordTime < 0) continue;
+
+                    // Pop in (0.1s with scale), hold (0.4s), slow fade (2.5s)
+                    const fadeDuration = 2.5;
+                    let alpha;
+                    if (wordTime < 0.1) {
+                        alpha = wordTime / 0.1;
+                    } else if (wordTime < 0.5) {
+                        alpha = 1.0;
+                    } else if (wordTime < 0.5 + fadeDuration) {
+                        alpha = 1.0 - (wordTime - 0.5) / fadeDuration;
+                    } else {
+                        alpha = 0;
+                    }
+
+                    if (alpha <= 0.01) continue;
+
+                    const pos = this._quoteWordPositions[i];
+
+                    // Scale pop on appear + random tilt
+                    const scale = wordTime < 0.15 ? 1.3 - (wordTime / 0.15) * 0.3 : 1.0;
+                    // Stable rotation per word (seeded from index)
+                    const rotation = ((i * 7 + 3) % 11 - 5) * 0.06;
+
+                    ctx.globalAlpha = alpha;
+
+                    ctx.save();
+                    ctx.translate(pos.x, pos.y);
+                    ctx.scale(scale, scale);
+                    ctx.rotate(rotation);
+
+                    // Black outline for comic pop
+                    ctx.font = `bold ${fontSize}px Impact, Arial Black, sans-serif`;
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 6;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(words[i], 0, 0);
+
+                    // Colored fill per word
+                    ctx.fillStyle = pos.color;
+                    ctx.shadowColor = pos.color;
+                    ctx.shadowBlur = wordTime < 0.2 ? 20 : 6;
+                    ctx.fillText(words[i], 0, 0);
+
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
         }
 
         // Shield charges — bottom left

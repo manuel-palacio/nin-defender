@@ -47,8 +47,8 @@ class Moon {
     constructor(canvas, assets) {
         this.canvas = canvas;
         this.assets = assets || {};
-        this.baseX = canvas.width * 0.75;
-        this.baseY = canvas.height * 0.2;
+        this.baseX = canvas.width * Utils.random(0.55, 0.85);
+        this.baseY = canvas.height * Utils.random(0.15, 0.8);
         this.radius = Math.min(canvas.width, canvas.height) * 0.15;
         this.scrollSpeed = 5; // very slow parallax
         this.craters = [];
@@ -208,8 +208,8 @@ class Moon {
 class Mars {
     constructor(canvas) {
         this.canvas = canvas;
-        this.baseX = canvas.width * Utils.random(0.6, 0.85);
-        this.baseY = canvas.height * Utils.random(0.15, 0.35);
+        this.baseX = canvas.width * Utils.random(0.55, 0.85);
+        this.baseY = canvas.height * Utils.random(0.15, 0.8);
         this.radius = Math.min(canvas.width, canvas.height) * Utils.random(0.12, 0.18);
         this.canyons = [];
         this.generateFeatures();
@@ -299,8 +299,8 @@ class Mars {
 class GasGiant {
     constructor(canvas) {
         this.canvas = canvas;
-        this.baseX = canvas.width * Utils.random(0.6, 0.85);
-        this.baseY = canvas.height * Utils.random(0.15, 0.4);
+        this.baseX = canvas.width * Utils.random(0.55, 0.85);
+        this.baseY = canvas.height * Utils.random(0.15, 0.8);
         this.radius = Math.min(canvas.width, canvas.height) * Utils.random(0.15, 0.22);
         this.bands = [];
         this.generateFeatures();
@@ -391,8 +391,8 @@ class GasGiant {
 class IcePlanet {
     constructor(canvas) {
         this.canvas = canvas;
-        this.baseX = canvas.width * Utils.random(0.6, 0.85);
-        this.baseY = canvas.height * Utils.random(0.15, 0.35);
+        this.baseX = canvas.width * Utils.random(0.55, 0.85);
+        this.baseY = canvas.height * Utils.random(0.15, 0.8);
         this.radius = Math.min(canvas.width, canvas.height) * Utils.random(0.1, 0.16);
         this.cracks = [];
         this.generateFeatures();
@@ -490,8 +490,8 @@ class IcePlanet {
 class RingedPlanet {
     constructor(canvas) {
         this.canvas = canvas;
-        this.baseX = canvas.width * Utils.random(0.6, 0.85);
-        this.baseY = canvas.height * Utils.random(0.15, 0.35);
+        this.baseX = canvas.width * Utils.random(0.55, 0.85);
+        this.baseY = canvas.height * Utils.random(0.15, 0.8);
         this.radius = Math.min(canvas.width, canvas.height) * Utils.random(0.1, 0.15);
         // Pick a random color theme
         const themes = [

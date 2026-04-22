@@ -1780,7 +1780,7 @@ class Boss extends Enemy {
 const PHASES = [
     // Phases 1-5: easy — generous gaps, one new enemy type per phase
     { name: 'ASTEROID FIELD',     threshold: 0,    featured: 'asteroid',  color: '#aa7733' },
-    { name: 'CRITTER COLONY',     threshold: 400,  featured: 'ship',      color: '#ff6644' },
+    { name: 'CRITTER COLONY',     threshold: 600,  featured: 'ship',      color: '#ff6644' },
     { name: 'FIREFLY SWARM',      threshold: 1000, featured: 'drone',     color: '#44ff66' },
     { name: 'JELLYFISH DRIFT',    threshold: 1800, featured: 'mine',      color: '#ff88cc' },
     { name: 'ARACHNID SECTOR',    threshold: 2800, featured: 'spider',    color: '#66ff22' },
@@ -1923,7 +1923,7 @@ class EnemySpawner {
     spawnMixed(score, canvasW, canvasH, largeTier) {
         // Build pool of available types — matches phase thresholds
         const pool = ['asteroid'];
-        if (score >= 400)   pool.push('ship');
+        if (score >= 600)   pool.push('ship');
         if (score >= 1000)  pool.push('drone');
         if (score >= 1800)  pool.push('mine');
         if (score >= 2800)  pool.push('spider');
