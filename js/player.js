@@ -570,36 +570,109 @@ class Player {
             }
         }
 
-        // Wingman drone
+        // Life progress bar below ship
+        {
+            const barW = this.width * 1.2;
+            const barH = 4;
+            const barX = -barW / 2;
+            const barY = this.height / 2 + 8;
+            const frac = this.lives / this.maxLives;
+            ctx.shadowBlur = 0;
+            // Background
+            ctx.fillStyle = 'rgba(60, 60, 60, 0.6)';
+            ctx.fillRect(barX, barY, barW, barH);
+            // Fill — color shifts from green to red
+            let barColor;
+            if (frac > 0.6) barColor = '#00cc44';
+            else if (frac > 0.3) barColor = '#cc8800';
+            else barColor = '#cc0000';
+            ctx.fillStyle = barColor;
+            ctx.shadowColor = barColor;
+            ctx.shadowBlur = 4;
+            ctx.fillRect(barX, barY, barW * frac, barH);
+            ctx.shadowBlur = 0;
+            // Border
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(barX, barY, barW, barH);
+        }
+
+        // Wingman drone — aggressive NIN-themed attack drone
         if (this.wingman) {
             ctx.save();
             ctx.translate(this.wingmanX - this.x, this.wingmanY - this.y);
-            const wScale = 0.5;
-            ctx.scale(wScale, wScale);
-            // Small ship shape
-            ctx.fillStyle = '#2255aa';
-            ctx.strokeStyle = '#4488ff';
-            ctx.shadowColor = '#4488ff';
-            ctx.shadowBlur = 6;
-            ctx.lineWidth = 1.5;
+            const t = this.engineTime;
+            const wPulse = 0.7 + 0.3 * Math.sin(t * 8);
+
+            // Energy aura
+            ctx.fillStyle = `rgba(204, 0, 0, ${0.1 * wPulse})`;
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 15 * wPulse;
             ctx.beginPath();
-            ctx.moveTo(20, 0);
-            ctx.lineTo(-12, -10);
+            ctx.arc(0, 0, 18, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Engine exhaust — dual flame
+            const wFlicker = 0.6 + 0.4 * Math.sin(t * 25);
+            ctx.fillStyle = `rgba(255, 50, 0, ${0.6 * wFlicker})`;
+            ctx.shadowColor = '#ff3300';
+            ctx.shadowBlur = 10 * wFlicker;
+            ctx.beginPath();
+            ctx.moveTo(-8, -4);
+            ctx.lineTo(-16 - 8 * wFlicker, -1);
             ctx.lineTo(-8, 0);
-            ctx.lineTo(-12, 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-8, 4);
+            ctx.lineTo(-16 - 8 * wFlicker, 1);
+            ctx.lineTo(-8, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Hull — angular attack drone
+            const hullGrad = ctx.createLinearGradient(-10, -8, 10, 8);
+            hullGrad.addColorStop(0, '#1a1a1a');
+            hullGrad.addColorStop(0.5, '#333');
+            hullGrad.addColorStop(1, '#1a1a1a');
+            ctx.fillStyle = hullGrad;
+            ctx.strokeStyle = '#cc0000';
+            ctx.shadowColor = '#cc0000';
+            ctx.shadowBlur = 4;
+            ctx.lineWidth = 1;
+            // Main body
+            ctx.beginPath();
+            ctx.moveTo(14, 0);      // nose
+            ctx.lineTo(4, -7);      // upper forward
+            ctx.lineTo(-6, -9);     // upper wing
+            ctx.lineTo(-8, -3);     // upper rear
+            ctx.lineTo(-8, 3);      // lower rear
+            ctx.lineTo(-6, 9);      // lower wing
+            ctx.lineTo(4, 7);       // lower forward
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
-            // Engine glow
-            const wFlicker = 0.6 + 0.4 * Math.sin(this.engineTime * 20);
-            ctx.fillStyle = `rgba(68, 136, 255, ${0.5 * wFlicker})`;
-            ctx.shadowBlur = 8 * wFlicker;
+
+            // Red accent stripe
+            ctx.fillStyle = '#cc0000';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(-4, -1, 12, 2);
+
+            // Weapon port glow
+            ctx.fillStyle = `rgba(255, 100, 0, ${wPulse})`;
+            ctx.shadowColor = '#ff6600';
+            ctx.shadowBlur = 5 * wPulse;
             ctx.beginPath();
-            ctx.moveTo(-8, -3);
-            ctx.lineTo(-14 - 5 * wFlicker, 0);
-            ctx.lineTo(-8, 3);
-            ctx.closePath();
+            ctx.arc(12, 0, 2, 0, Math.PI * 2);
             ctx.fill();
+
+            // NIN micro text
+            ctx.shadowBlur = 0;
+            ctx.font = 'bold 5px Arial Black, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(204, 0, 0, ${0.5 + 0.3 * wPulse})`;
+            ctx.fillText('NIN', 0, 2);
+
             ctx.restore();
         }
 
