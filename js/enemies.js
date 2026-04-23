@@ -1622,10 +1622,17 @@ class Boss extends Enemy {
         ctx.translate(this.x, this.y);
 
         // Dispatch to themed boss drawing
-        if (this.bossType === 3) { this._drawSpiderBoss(ctx, r, t, color, pulse); }
-        else if (this.bossType === 5) { this._drawOctopusBoss(ctx, r, t, color, pulse); }
-        else if (this.bossType >= 7) { this._drawDevilBoss(ctx, r, t, color, pulse); }
-        else { this._drawDefaultBoss(ctx, r, t, color, pulse); }
+        const drawMethods = {
+            0: '_drawCritterBoss',
+            1: '_drawFireflyBoss',
+            2: '_drawJellyfishBoss',
+            3: '_drawSpiderBoss',
+            4: '_drawGhostBoss',
+            5: '_drawOctopusBoss',
+            6: '_drawChameleonBoss',
+        };
+        const method = drawMethods[this.bossType] || (this.bossType >= 7 ? '_drawDevilBoss' : '_drawDefaultBoss');
+        this[method](ctx, r, t, color, pulse);
 
         // --- Health bar (all bosses) ---
         const barW = r * 2.2;
@@ -1644,6 +1651,320 @@ class Boss extends Enemy {
         ctx.fillStyle = barColor;
         ctx.fillRect(-barW / 2, -r - 18, barW * frac, barH);
 
+        ctx.restore();
+    }
+
+    _drawCritterBoss(ctx, r, t, color, pulse) {
+        // Giant armored bug — antennae, mandibles, segmented shell, legs
+
+        // Legs — 4 per side, scuttling
+        ctx.strokeStyle = '#884422';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < 4; i++) {
+                const phase = i * 1.0 + (side > 0 ? Math.PI * 0.4 : 0);
+                const wave = Math.sin(t * 6 + phase) * 0.2;
+                const baseAngle = side * 0.45 + (i - 1.5) * 0.35;
+                const jx = Math.cos(baseAngle + wave) * r * 0.7;
+                const jy = Math.sin(baseAngle + wave) * r * 0.65 * side;
+                const tx = Math.cos(baseAngle + wave + side * 0.3) * r * 1.2;
+                const ty = Math.sin(baseAngle + wave + side * 0.3) * r * 1.0 * side;
+                ctx.beginPath();
+                ctx.moveTo(0, side * r * 0.12);
+                ctx.lineTo(jx, jy);
+                ctx.lineTo(tx, ty);
+                ctx.stroke();
+            }
+        }
+
+        // Antennae
+        ctx.strokeStyle = '#cc6633';
+        ctx.lineWidth = 2;
+        const antWave = Math.sin(t * 3) * 0.25;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.45, -r * 0.15);
+        ctx.quadraticCurveTo(-r * 0.9, -r * 0.7 - antWave * r, -r, -r * 0.55);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.45, r * 0.15);
+        ctx.quadraticCurveTo(-r * 0.9, r * 0.7 + antWave * r, -r, r * 0.55);
+        ctx.stroke();
+        // Tips
+        ctx.fillStyle = '#ffaa00';
+        ctx.shadowColor = '#ffaa00';
+        ctx.shadowBlur = 5;
+        ctx.beginPath(); ctx.arc(-r, -r * 0.55, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r, r * 0.55, 3, 0, Math.PI * 2); ctx.fill();
+
+        // Abdomen — segmented shell
+        ctx.shadowBlur = 0;
+        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.55);
+        abdGrad.addColorStop(0, '#cc6633');
+        abdGrad.addColorStop(0.6, '#884420');
+        abdGrad.addColorStop(1, '#442210');
+        ctx.fillStyle = abdGrad;
+        ctx.beginPath();
+        ctx.ellipse(r * 0.15, 0, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Shell segments
+        ctx.strokeStyle = 'rgba(50, 20, 10, 0.6)';
+        ctx.lineWidth = 1.5;
+        for (let s = -2; s <= 2; s++) {
+            const sx = r * 0.15 + s * r * 0.12;
+            ctx.beginPath();
+            ctx.moveTo(sx, -r * 0.38);
+            ctx.lineTo(sx, r * 0.38);
+            ctx.stroke();
+        }
+        // Shell pattern spots
+        ctx.fillStyle = `rgba(255, 180, 60, ${0.3 + 0.15 * pulse})`;
+        ctx.beginPath(); ctx.ellipse(r * 0.25, -r * 0.1, r * 0.08, r * 0.06, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.05, r * 0.12, r * 0.07, r * 0.05, -0.3, 0, Math.PI * 2); ctx.fill();
+
+        // Head
+        const headGrad = ctx.createRadialGradient(-r * 0.35, 0, 0, -r * 0.35, 0, r * 0.38);
+        headGrad.addColorStop(0, '#dd7744');
+        headGrad.addColorStop(1, '#663318');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.35, 0, r * 0.38, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes — large, glowing yellow
+        const eyePulse = 0.7 + 0.3 * Math.sin(t * 5);
+        ctx.fillStyle = `rgba(255, 220, 0, ${eyePulse})`;
+        ctx.shadowColor = '#ffdd00';
+        ctx.shadowBlur = 8 * eyePulse;
+        ctx.beginPath(); ctx.arc(-r * 0.5, -r * 0.13, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.5, r * 0.13, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        // Pupils
+        ctx.fillStyle = '#331100';
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(-r * 0.52, -r * 0.13, r * 0.035, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.52, r * 0.13, r * 0.035, 0, Math.PI * 2); ctx.fill();
+
+        // Mandibles — pinching
+        ctx.strokeStyle = '#aa5522';
+        ctx.lineWidth = 3;
+        const mWave = Math.sin(t * 4) * 0.12;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r * 0.08);
+        ctx.quadraticCurveTo(-r * 0.85, -r * 0.2 - mWave * r, -r * 0.8, -r * 0.3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, r * 0.08);
+        ctx.quadraticCurveTo(-r * 0.85, r * 0.2 + mWave * r, -r * 0.8, r * 0.3);
+        ctx.stroke();
+    }
+
+    _drawFireflyBoss(ctx, r, t, color, pulse) {
+        // Giant queen firefly — pulsing bioluminescence, wings, swarm aura
+        const glow = 0.5 + 0.5 * Math.sin(t * 4);
+
+        // Aura of light
+        ctx.fillStyle = `rgba(220, 255, 0, ${0.08 * glow})`;
+        ctx.shadowColor = '#ddff00';
+        ctx.shadowBlur = 30 * glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Wings — large, translucent, fluttering
+        const wingAngle = Math.sin(t * 12) * 0.4;
+        ctx.fillStyle = `rgba(200, 255, 50, ${0.15 + 0.1 * glow})`;
+        ctx.shadowBlur = 8;
+        ctx.save(); ctx.rotate(-wingAngle);
+        ctx.beginPath(); ctx.ellipse(0, -r * 0.3, r * 0.9, r * 0.35, -0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.rotate(wingAngle);
+        ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.9, r * 0.35, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Body
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#3a3a10';
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.45, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Glowing abdomen
+        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.3);
+        abdGrad.addColorStop(0, `rgba(255, 255, 50, ${0.8 * glow})`);
+        abdGrad.addColorStop(1, `rgba(150, 200, 0, ${0.3 * glow})`);
+        ctx.fillStyle = abdGrad;
+        ctx.shadowColor = '#ddff00';
+        ctx.shadowBlur = 15 * glow;
+        ctx.beginPath(); ctx.ellipse(r * 0.15, 0, r * 0.3, r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Eyes
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.08, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.3, r * 0.08, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath(); ctx.arc(-r * 0.32, -r * 0.08, r * 0.03, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.32, r * 0.08, r * 0.03, 0, Math.PI * 2); ctx.fill();
+    }
+
+    _drawJellyfishBoss(ctx, r, t, color, pulse) {
+        // Giant jellyfish — dome bell, long tentacles, ethereal glow
+
+        // Tentacles — long, flowing
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 10; i++) {
+            const angle = (i / 10) * Math.PI * 0.9 + Math.PI * 0.55;
+            const w1 = Math.sin(t * 2 + i * 0.8) * 0.3;
+            const w2 = Math.sin(t * 1.5 + i * 1.2) * 0.25;
+            const len1 = r * 1.3;
+            const len2 = r * (2.0 + 0.3 * Math.sin(t + i));
+            const mx = Math.cos(angle + w1) * len1;
+            const my = Math.sin(angle + w1) * len1;
+            const ex = Math.cos(angle + w1 + w2) * len2;
+            const ey = Math.sin(angle + w1 + w2) * len2;
+            ctx.strokeStyle = `hsla(320, 70%, 60%, ${0.4 + 0.2 * pulse})`;
+            ctx.lineWidth = 3 - i * 0.2;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(angle) * r * 0.4, Math.sin(angle) * r * 0.4);
+            ctx.quadraticCurveTo(mx, my, ex, ey);
+            ctx.stroke();
+        }
+
+        // Bell dome
+        const bellGrad = ctx.createRadialGradient(0, -r * 0.1, 0, 0, 0, r * 0.6);
+        bellGrad.addColorStop(0, `hsla(320, 80%, 75%, ${0.6 + 0.2 * pulse})`);
+        bellGrad.addColorStop(0.5, `hsla(320, 60%, 45%, 0.4)`);
+        bellGrad.addColorStop(1, `hsla(320, 50%, 25%, 0.15)`);
+        ctx.fillStyle = bellGrad;
+        ctx.shadowColor = '#ff66cc';
+        ctx.shadowBlur = 12 * pulse;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.55, Math.PI, 0);
+        ctx.quadraticCurveTo(r * 0.55, r * 0.25, r * 0.3, r * 0.3);
+        ctx.lineTo(-r * 0.3, r * 0.3);
+        ctx.quadraticCurveTo(-r * 0.55, r * 0.25, -r * 0.55, 0);
+        ctx.fill();
+
+        // Inner glow
+        ctx.fillStyle = `hsla(330, 100%, 70%, ${0.3 * pulse})`;
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 0.15, 0, Math.PI * 2); ctx.fill();
+    }
+
+    _drawGhostBoss(ctx, r, t, color, pulse) {
+        // Giant wraith — translucent, wispy, hollow eyes
+
+        // Wispy trails
+        const alphaBase = 0.3 + 0.3 * Math.sin(t * 1.5);
+        ctx.globalAlpha = alphaBase * 0.4;
+        ctx.fillStyle = '#8844cc';
+        for (let i = 0; i < 5; i++) {
+            const tx = r * 0.3 + i * r * 0.2;
+            const ty = Math.sin(t * 2 + i) * r * 0.25;
+            const tLen = r * (0.5 + 0.3 * Math.sin(t * 1.5 + i));
+            ctx.beginPath();
+            ctx.moveTo(tx, ty - r * 0.1);
+            ctx.quadraticCurveTo(tx + tLen * 0.5, ty + r * 0.15, tx + tLen, ty + r * 0.3);
+            ctx.quadraticCurveTo(tx + tLen * 0.5, ty - r * 0.1, tx, ty + r * 0.1);
+            ctx.fill();
+        }
+
+        // Main body — ghostly blob
+        ctx.globalAlpha = alphaBase;
+        const bodyGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.7);
+        bodyGrad.addColorStop(0, 'rgba(200, 150, 255, 0.7)');
+        bodyGrad.addColorStop(0.5, 'rgba(120, 70, 200, 0.4)');
+        bodyGrad.addColorStop(1, 'rgba(60, 30, 120, 0.1)');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.1, r * 0.65, Math.PI, 0);
+        ctx.quadraticCurveTo(r * 0.65, r * 0.4, r * 0.25, r * 0.5);
+        ctx.quadraticCurveTo(0, r * 0.7, -r * 0.25, r * 0.5);
+        ctx.quadraticCurveTo(-r * 0.65, r * 0.4, -r * 0.65, 0);
+        ctx.fill();
+
+        // Hollow eyes
+        ctx.globalAlpha = alphaBase + 0.4;
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#cc88ff';
+        ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.12, r * 0.13, r * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.12, -r * 0.12, r * 0.13, r * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#220044';
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.08, r * 0.06, r * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.12, -r * 0.08, r * 0.06, r * 0.1, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Eerie mouth
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, r * 0.1, r * 0.2, 0.2, Math.PI - 0.2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+
+    _drawChameleonBoss(ctx, r, t, color, pulse) {
+        // Giant chameleon — color-shifting, curled tail, rotating eyes
+        const hue = (t * 40) % 360;
+        const bodyColor = `hsl(${hue}, 50%, 30%)`;
+        const spotColor = `hsl(${(hue + 120) % 360}, 70%, 45%)`;
+
+        // Curled tail
+        ctx.strokeStyle = bodyColor;
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        const tailCurl = Math.sin(t * 2) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.4, 0);
+        ctx.quadraticCurveTo(r * 0.9, r * 0.2, r * 1.2, -r * 0.1 + tailCurl * r);
+        ctx.quadraticCurveTo(r * 1.4, -r * 0.5, r * 1.1, -r * 0.6 + tailCurl * r);
+        ctx.quadraticCurveTo(r * 0.8, -r * 0.5, r * 0.9, -r * 0.3);
+        ctx.stroke();
+
+        // Legs — stubby
+        ctx.lineWidth = 4;
+        const legWave = Math.sin(t * 5) * 0.15;
+        ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.3); ctx.lineTo(-r * 0.4, -r * 0.65 - legWave * r); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.3); ctx.lineTo(-r * 0.4, r * 0.65 + legWave * r); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r * 0.15, -r * 0.3); ctx.lineTo(r * 0.3, -r * 0.6 + legWave * r); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r * 0.15, r * 0.3); ctx.lineTo(r * 0.3, r * 0.6 - legWave * r); ctx.stroke();
+
+        // Body
+        const bGrad = ctx.createRadialGradient(-r * 0.1, 0, 0, 0, 0, r * 0.55);
+        bGrad.addColorStop(0, `hsl(${hue}, 40%, 40%)`);
+        bGrad.addColorStop(1, `hsl(${hue}, 50%, 18%)`);
+        ctx.fillStyle = bGrad;
+        ctx.shadowColor = `hsl(${hue}, 60%, 40%)`;
+        ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Head
+        ctx.fillStyle = `hsl(${hue}, 45%, 35%)`;
+        ctx.beginPath(); ctx.ellipse(-r * 0.45, 0, r * 0.3, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(-r * 0.7, 0, r * 0.15, r * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Color spots
+        ctx.fillStyle = spotColor;
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(r * 0.1, -r * 0.1, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.1, r * 0.13, r * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.25, r * 0.05, r * 0.05, 0, Math.PI * 2); ctx.fill();
+
+        // Eyes — large, independent rotation
+        const eye1Angle = Math.sin(t * 1.5) * 0.6;
+        const eye2Angle = Math.sin(t * 2.1 + 1) * 0.6;
+        ctx.fillStyle = `hsl(55, 100%, 55%)`;
+        ctx.shadowColor = '#ffff00';
+        ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.arc(-r * 0.5, -r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.5, r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill();
+        // Slit pupils
+        ctx.fillStyle = '#000';
+        ctx.shadowBlur = 0;
+        ctx.save(); ctx.translate(-r * 0.5, -r * 0.15); ctx.rotate(eye1Angle);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.02, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.save(); ctx.translate(-r * 0.5, r * 0.15); ctx.rotate(eye2Angle);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.02, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
 

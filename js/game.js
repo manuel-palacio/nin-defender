@@ -366,11 +366,6 @@ class Game {
                 this.spawner.timer = 3.0;
             }
 
-            // New phase — switch to a new random track
-            if (this.music && this.music.playing) {
-                this.music._playRandom();
-            }
-
             // Spawn boss at each phase transition (except phase 0)
             if (currentPhase > 0 && this.bossSpawnedForPhase < currentPhase) {
                 this.bossSpawnedForPhase = currentPhase;
