@@ -1621,6 +1621,238 @@ class Boss extends Enemy {
         ctx.save();
         ctx.translate(this.x, this.y);
 
+        // Dispatch to themed boss drawing
+        if (this.bossType === 3) { this._drawSpiderBoss(ctx, r, t, color, pulse); }
+        else if (this.bossType === 5) { this._drawOctopusBoss(ctx, r, t, color, pulse); }
+        else if (this.bossType >= 7) { this._drawDevilBoss(ctx, r, t, color, pulse); }
+        else { this._drawDefaultBoss(ctx, r, t, color, pulse); }
+
+        // --- Health bar (all bosses) ---
+        const barW = r * 2.2;
+        const barH = 5;
+        const frac = this.hp / this.maxHp;
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(-barW / 2, -r - 18, barW, barH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-barW / 2, -r - 18, barW, barH);
+        let barColor;
+        if (frac > 0.6) barColor = '#00ff66';
+        else if (frac > 0.3) barColor = '#ffaa00';
+        else barColor = '#ff3366';
+        ctx.fillStyle = barColor;
+        ctx.fillRect(-barW / 2, -r - 18, barW * frac, barH);
+
+        ctx.restore();
+    }
+
+    _drawSpiderBoss(ctx, r, t, color, pulse) {
+        // Giant spider boss — 6 legs per side, bulbous body, many eyes
+        const legCount = 6;
+
+        // Legs — long, animated
+        ctx.strokeStyle = '#44aa11';
+        ctx.shadowColor = '#66ff22';
+        ctx.shadowBlur = 4;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < legCount; i++) {
+                const phase = i * 0.7 + (side > 0 ? Math.PI * 0.3 : 0);
+                const wave = Math.sin(t * 5 + phase) * 0.25;
+                const baseAngle = side * 0.5 + (i - legCount / 2 + 0.5) * 0.3;
+                const jx = Math.cos(baseAngle + wave) * r * 0.8;
+                const jy = Math.sin(baseAngle + wave) * r * 0.7 * side;
+                const tx = Math.cos(baseAngle + wave + side * 0.35) * r * 1.5;
+                const ty = Math.sin(baseAngle + wave + side * 0.35) * r * 1.2 * side;
+                ctx.beginPath();
+                ctx.moveTo(0, side * r * 0.1);
+                ctx.lineTo(jx, jy);
+                ctx.lineTo(tx, ty);
+                ctx.stroke();
+            }
+        }
+
+        // Abdomen (rear, large)
+        ctx.shadowBlur = 0;
+        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.6);
+        abdGrad.addColorStop(0, '#3a5510');
+        abdGrad.addColorStop(0.6, '#1a2a08');
+        abdGrad.addColorStop(1, '#0a1000');
+        ctx.fillStyle = abdGrad;
+        ctx.beginPath();
+        ctx.ellipse(r * 0.2, 0, r * 0.6, r * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Toxic markings
+        ctx.fillStyle = `rgba(100, 200, 30, ${0.3 + 0.2 * pulse})`;
+        ctx.beginPath(); ctx.ellipse(r * 0.3, -r * 0.1, r * 0.15, r * 0.1, 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.1, r * 0.15, r * 0.1, r * 0.08, -0.3, 0, Math.PI * 2); ctx.fill();
+
+        // Head/thorax (front)
+        const headGrad = ctx.createRadialGradient(-r * 0.35, 0, 0, -r * 0.35, 0, r * 0.4);
+        headGrad.addColorStop(0, '#2a3a0a');
+        headGrad.addColorStop(1, '#0a1200');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.35, 0, r * 0.4, r * 0.32, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Multiple eyes — 8 glowing red
+        const eyeGlow = 0.6 + 0.4 * Math.sin(t * 4);
+        ctx.fillStyle = `rgba(255, 0, 0, ${eyeGlow})`;
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 8 * eyeGlow;
+        const eyes = [
+            [-r * 0.55, -r * 0.12, r * 0.06], [-r * 0.55, r * 0.12, r * 0.06],
+            [-r * 0.5, -r * 0.22, r * 0.04], [-r * 0.5, r * 0.22, r * 0.04],
+            [-r * 0.6, -r * 0.05, r * 0.04], [-r * 0.6, r * 0.05, r * 0.04],
+            [-r * 0.45, -r * 0.18, r * 0.03], [-r * 0.45, r * 0.18, r * 0.03],
+        ];
+        for (const [ex, ey, er] of eyes) {
+            ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Mandibles
+        ctx.strokeStyle = '#88aa22';
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 3;
+        const mWave = Math.sin(t * 3) * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r * 0.08);
+        ctx.quadraticCurveTo(-r * 0.85, -r * 0.25 - mWave * r, -r * 0.75, -r * 0.35);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, r * 0.08);
+        ctx.quadraticCurveTo(-r * 0.85, r * 0.25 + mWave * r, -r * 0.75, r * 0.35);
+        ctx.stroke();
+    }
+
+    _drawOctopusBoss(ctx, r, t, color, pulse) {
+        // Giant octopus boss — tentacles and bulbous head
+        const tentCount = 8;
+        ctx.lineCap = 'round';
+
+        // Tentacles
+        for (let i = 0; i < tentCount; i++) {
+            const angle = (i / tentCount) * Math.PI * 1.6 + Math.PI * 0.2;
+            const w1 = Math.sin(t * 2 + i * 1.0) * 0.35;
+            const w2 = Math.sin(t * 1.8 + i * 0.6) * 0.25;
+            const sx = Math.cos(angle) * r * 0.5;
+            const sy = Math.sin(angle) * r * 0.5;
+            const mx = Math.cos(angle + w1) * r * 1.2;
+            const my = Math.sin(angle + w1) * r * 1.1;
+            const ex = Math.cos(angle + w1 + w2) * r * 1.8;
+            const ey = Math.sin(angle + w1 + w2) * r * 1.5;
+            ctx.strokeStyle = `hsla(275, 50%, ${30 + i * 3}%, 0.7)`;
+            ctx.lineWidth = 5 - i * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(mx, my, ex, ey);
+            ctx.stroke();
+        }
+
+        // Head dome
+        const hGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.65);
+        hGrad.addColorStop(0, '#cc66ff');
+        hGrad.addColorStop(0.5, '#7722bb');
+        hGrad.addColorStop(1, '#330066');
+        ctx.fillStyle = hGrad;
+        ctx.shadowColor = '#aa44ff';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.ellipse(0, -r * 0.1, r * 0.6, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bioluminescent spots
+        ctx.fillStyle = `rgba(200, 150, 255, ${0.4 * pulse})`;
+        ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.2, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(r * 0.15, -r * 0.15, r * 0.06, 0, Math.PI * 2); ctx.fill();
+
+        // Eyes — large, intelligent
+        ctx.fillStyle = '#eeddff';
+        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.05, r * 0.14, r * 0.1, -0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.15, -r * 0.05, r * 0.14, r * 0.1, 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#110022';
+        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.03, r * 0.04, r * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.15, -r * 0.03, r * 0.04, r * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    _drawDevilBoss(ctx, r, t, color, pulse) {
+        // Devil/demon boss — horns, fire, menacing
+        const fireFlicker = 0.7 + 0.3 * Math.sin(t * 12);
+
+        // Fire aura
+        ctx.fillStyle = `rgba(255, 40, 0, ${0.15 * fireFlicker})`;
+        ctx.shadowColor = '#ff4400';
+        ctx.shadowBlur = 20 * fireFlicker;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Horns — large
+        ctx.strokeStyle = '#aa1100';
+        ctx.fillStyle = '#661100';
+        ctx.shadowBlur = 6;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.2, -r * 0.5);
+        ctx.quadraticCurveTo(-r * 0.5, -r * 1.4, -r * 0.05, -r * 1.2);
+        ctx.lineTo(-r * 0.1, -r * 0.5);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.2, -r * 0.5);
+        ctx.quadraticCurveTo(r * 0.5, -r * 1.4, r * 0.05, -r * 1.2);
+        ctx.lineTo(r * 0.1, -r * 0.5);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // Head — dark red sphere
+        const headGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.7);
+        headGrad.addColorStop(0, '#881100');
+        headGrad.addColorStop(0.6, '#440808');
+        headGrad.addColorStop(1, '#220000');
+        ctx.fillStyle = headGrad;
+        ctx.shadowColor = '#ff2200';
+        ctx.shadowBlur = 10 * fireFlicker;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Glowing eyes
+        const eyeGlow = 0.7 + 0.3 * Math.sin(t * 6);
+        ctx.fillStyle = `rgba(255, 200, 0, ${eyeGlow})`;
+        ctx.shadowColor = '#ffaa00';
+        ctx.shadowBlur = 12 * eyeGlow;
+        ctx.save();
+        ctx.translate(-r * 0.22, -r * 0.12);
+        ctx.rotate(-0.25);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.13, r * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.translate(r * 0.18, -r * 0.12);
+        ctx.rotate(0.25);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.13, r * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+
+        // Jagged mouth
+        ctx.strokeStyle = `rgba(255, 100, 0, ${0.7 + 0.3 * fireFlicker})`;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.3, r * 0.15);
+        for (let i = 0; i < 6; i++) {
+            const mx = -r * 0.3 + (i + 0.5) * (r * 0.6 / 6);
+            const my = r * 0.15 + (i % 2 === 0 ? r * 0.12 : 0);
+            ctx.lineTo(mx, my);
+        }
+        ctx.lineTo(r * 0.3, r * 0.15);
+        ctx.stroke();
+    }
+
+    _drawDefaultBoss(ctx, r, t, color, pulse) {
         // --- Engine glow (rear) ---
         const engineFlicker = 0.7 + 0.3 * Math.sin(t * 15);
         ctx.fillStyle = `rgba(100, 150, 255, ${0.4 * engineFlicker})`;
@@ -1736,27 +1968,6 @@ class Boss extends Enemy {
         ctx.arc(-r * 0.75, r * 0.08, r * 0.04, 0, Math.PI * 2);
         ctx.fill();
 
-        // --- Health bar (wide, across top) ---
-        const barW = r * 2.2;
-        const barH = 5;
-        const frac = this.hp / this.maxHp;
-        ctx.shadowBlur = 0;
-        // Background
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(-barW / 2, -r - 18, barW, barH);
-        // Border
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-barW / 2, -r - 18, barW, barH);
-        // Fill
-        let barColor;
-        if (frac > 0.6) barColor = '#00ff66';
-        else if (frac > 0.3) barColor = '#ffaa00';
-        else barColor = '#ff3366';
-        ctx.fillStyle = barColor;
-        ctx.fillRect(-barW / 2, -r - 18, barW * frac, barH);
-
-        ctx.restore();
     }
 
     // Helper: darken a hex/named color by mixing toward black
