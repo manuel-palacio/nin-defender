@@ -66,13 +66,13 @@ const SONG_LYRICS = {
         'PRAY TO YOUR GOD, IT WON\'T SAVE YOU NOW',
     ],
     'deep': [
-        'I FEEL YOU IN ME',
-        'DOWN IN IT',
-        'NOTHING CAN STOP ME NOW',
-        'TAKE MY HAND WE\'RE GOING SOMEWHERE',
-        'YOU LET ME DESECRATE YOU',
-        'YOU LET ME VIOLATE YOU',
-        'THERE IS NO TURNING BACK NOW',
+        'YOU LET ME PENETRATE YOU',
+        'DEEP',
+        'I WANNA FEEL YOU FROM THE INSIDE',
+        'NOTHING QUITE LIKE THE FEEL OF SOMETHING NEW',
+        'GETTING CLOSER ALL THE TIME',
+        'THE DEEPER THAT I GO THE MORE I KNOW',
+        'SOMEWHERE INSIDE ALL ALONG',
     ],
     'not-so-pretty-now': [
         'NOT SO PRETTY NOW',
@@ -541,7 +541,14 @@ class Game {
     showRandomQuote() {
         // Get lyrics for the currently playing song
         const trackName = this.music && this.music.currentTrackName;
-        const lyrics = (trackName && SONG_LYRICS[trackName]) || Object.values(SONG_LYRICS)[0];
+        const lyrics = (trackName && SONG_LYRICS[trackName]) || null;
+        if (!lyrics || lyrics.length === 0) return;
+
+        // Reset used quotes when song changes
+        if (this._lastTrackName !== trackName) {
+            this._lastTrackName = trackName;
+            this.usedQuotes = [];
+        }
 
         if (this.usedQuotes.length >= lyrics.length) {
             this.usedQuotes = [];
@@ -552,12 +559,6 @@ class Game {
         this.quoteText = lyrics[idx];
         this.quoteTimer = this.quoteDuration;
         this._quoteWordPositions = null;
-
-        // Reset used quotes when song changes
-        if (this._lastTrackName !== trackName) {
-            this._lastTrackName = trackName;
-            this.usedQuotes = [];
-        }
     }
 
     spawnPowerUp() {
