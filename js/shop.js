@@ -70,7 +70,9 @@ class Shop {
 
         // Items
         const startY = h * 0.24;
-        const itemH = Math.min(h * 0.1, 55);
+        // Scale items to fit — ensure CONTINUE button isn't clipped
+        const availableH = h * 0.6; // space between startY and continue button
+        const itemH = Math.min(availableH / SHOP_ITEMS.length, 55);
         const itemW = Math.min(w * 0.7, 500);
         const startX = (w - itemW) / 2;
 
@@ -159,11 +161,14 @@ class Shop {
         this._itemH = itemH;
         this._canvasH = h;
 
-        // Controls hint
+        // Controls hint — touch-aware
         ctx.textAlign = 'center';
         ctx.font = '11px Courier New';
         ctx.fillStyle = '#444';
-        ctx.fillText('W/S to select • SPACE to buy • ENTER to continue', w / 2, h * 0.96);
+        const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        ctx.fillText(isMobile
+            ? 'TAP to select • TAP again to buy • CONTINUE to proceed'
+            : 'W/S to select • SPACE to buy • ENTER to continue', w / 2, h * 0.96);
 
         ctx.restore();
     }

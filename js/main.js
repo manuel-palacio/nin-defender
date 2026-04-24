@@ -138,6 +138,15 @@
             e.preventDefault();
             game.touchFiring = true;
         });
+        fireButton.addEventListener('touchmove', e => {
+            // Stop firing if finger moves outside the button
+            const touch = e.changedTouches[0];
+            const rect = fireButton.getBoundingClientRect();
+            if (touch.clientX < rect.left || touch.clientX > rect.right ||
+                touch.clientY < rect.top || touch.clientY > rect.bottom) {
+                game.touchFiring = false;
+            }
+        });
         fireButton.addEventListener('touchend', () => {
             game.touchFiring = false;
         });
