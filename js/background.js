@@ -518,7 +518,11 @@ class IcePlanet {
         ctx.save();
 
         // Sprite rendering — use alienMoon or planetIce if available
-        const iceSprite = this.assets.planetIce || this.assets.alienMoon;
+        if (!this._iceSprite) {
+            const icePlanets = [this.assets.planetIce, this.assets.planetIce2, this.assets.alienMoon].filter(Boolean);
+            this._iceSprite = icePlanets.length > 0 ? icePlanets[Math.floor(Math.random() * icePlanets.length)] : null;
+        }
+        const iceSprite = this._iceSprite;
         if (iceSprite) {
             const drawSize = r * 2.4;
             ctx.globalAlpha = 0.85;

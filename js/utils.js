@@ -472,6 +472,7 @@ const ASSET_MANIFEST = {
     moon:        'assets/moon.png',
     planetRed:   'assets/planet-red.png',
     planetIce:   'assets/planet-ice.png',
+    planetIce2:  'assets/planet-ice-2.png',
     alienMoon:   'assets/alien-moon.png',
     boss0:       'assets/bosses/boss-0.png',
     boss1:       'assets/bosses/boss-1.png',
