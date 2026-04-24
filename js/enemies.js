@@ -1622,24 +1622,7 @@ class Boss extends Enemy {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Sprite rendering if available
-        const spriteKey = 'boss' + this.bossType;
-        const spriteImg = this.assets && this.assets[spriteKey];
-        if (spriteImg) {
-            const drawH = r * 2.2;
-            const drawW = drawH * (spriteImg.width / spriteImg.height);
-            ctx.save();
-            ctx.rotate(-Math.PI / 2); // sprite faces up → rotate to face left
-            ctx.drawImage(spriteImg, -drawW / 2, -drawH / 2, drawW, drawH);
-            ctx.restore();
-
-            // Health bar still drawn
-            this._drawBossHealthBar(ctx, r);
-            ctx.restore();
-            return;
-        }
-
-        // Canvas fallback — dispatch to themed boss drawing
+        // Dispatch to themed boss drawing (all canvas-animated)
         const drawMethods = {
             0: '_drawCritterBoss',
             1: '_drawFireflyBoss',
