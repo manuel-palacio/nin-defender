@@ -167,3 +167,10 @@ fly deploy
 | Me, I'm Not (menu) | me-im-not.mp3 |
 
 Lyrics sourced from each song and displayed in-game when that song is playing.
+
+## Credits
+
+- Music: Nine Inch Nails remixes sourced from the now-defunct **remix.nin.com** (official NIN remix site)
+- Planet sprites: Generated with Midjourney
+- Player ship sprite: Generated with Midjourney
+- Everything else: HTML5 Canvas + vanilla JS
