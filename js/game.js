@@ -214,7 +214,7 @@ class Game {
                 this._codeBuffer = '';
             } else if (this._codeBuffer.endsWith('CLOSER')) {
                 // Spawn a max-level boss
-                const boss = new Boss(this.canvas.width, this.canvas.height, 9);
+                const boss = new Boss(this.canvas.width, this.canvas.height, 9, this.assets);
                 boss.canvas_w = this.canvas.width;
                 this.spawner.enemies.push(boss);
                 this.bossActive = true;
@@ -329,7 +329,7 @@ class Game {
             // Spawn boss at each phase transition (except phase 0)
             if (currentPhase > 0 && this.bossSpawnedForPhase < currentPhase) {
                 this.bossSpawnedForPhase = currentPhase;
-                const boss = new Boss(this.canvas.width, this.canvas.height, currentPhase - 1);
+                const boss = new Boss(this.canvas.width, this.canvas.height, currentPhase - 1, this.assets);
                 boss.canvas_w = this.canvas.width;
                 this.spawner.enemies.push(boss);
                 this.bossActive = true;

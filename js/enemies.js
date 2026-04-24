@@ -1425,9 +1425,10 @@ class AlienDevil extends Enemy {
 // Boss — Large, multi-phase boss with cycling attack patterns
 // ============================================================
 class Boss extends Enemy {
-    constructor(canvasW, canvasH, bossType = 0) {
+    constructor(canvasW, canvasH, bossType = 0, assets = {}) {
         super();
         this.type = 'boss';
+        this.assets = assets;
         this.bossType = Utils.clamp(bossType, 0, 9);
         this.radius = (30 + this.bossType * 2) * GAME_SCALE;
 
@@ -1621,7 +1622,24 @@ class Boss extends Enemy {
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Dispatch to themed boss drawing
+        // Sprite rendering if available
+        const spriteKey = 'boss' + this.bossType;
+        const spriteImg = this.assets && this.assets[spriteKey];
+        if (spriteImg) {
+            const drawH = r * 2.2;
+            const drawW = drawH * (spriteImg.width / spriteImg.height);
+            ctx.save();
+            ctx.rotate(-Math.PI / 2); // sprite faces up → rotate to face left
+            ctx.drawImage(spriteImg, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.restore();
+
+            // Health bar still drawn
+            this._drawBossHealthBar(ctx, r);
+            ctx.restore();
+            return;
+        }
+
+        // Canvas fallback — dispatch to themed boss drawing
         const drawMethods = {
             0: '_drawCritterBoss',
             1: '_drawFireflyBoss',
@@ -1634,7 +1652,11 @@ class Boss extends Enemy {
         const method = drawMethods[this.bossType] || (this.bossType >= 7 ? '_drawDevilBoss' : '_drawDefaultBoss');
         this[method](ctx, r, t, color, pulse);
 
-        // --- Health bar (all bosses) ---
+        this._drawBossHealthBar(ctx, r);
+        ctx.restore();
+    }
+
+    _drawBossHealthBar(ctx, r) {
         const barW = r * 2.2;
         const barH = 5;
         const frac = this.hp / this.maxHp;
@@ -1650,8 +1672,6 @@ class Boss extends Enemy {
         else barColor = '#ff3366';
         ctx.fillStyle = barColor;
         ctx.fillRect(-barW / 2, -r - 18, barW * frac, barH);
-
-        ctx.restore();
     }
 
     _drawCritterBoss(ctx, r, t, color, pulse) {
