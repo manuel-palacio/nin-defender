@@ -112,6 +112,7 @@ class ProjectilePool {
                 this.pool[i].update(dt, canvasW, canvasH);
             }
         }
+        this._rebuildCache();
     }
 
     draw(ctx) {
@@ -123,14 +124,28 @@ class ProjectilePool {
     }
 
     getActive() {
-        return this.pool.filter(p => p.active);
+        return this._cachedActive;
     }
 
     getPlayerBullets() {
-        return this.pool.filter(p => p.active && !p.isEnemy);
+        return this._cachedPlayer;
     }
 
     getEnemyBullets() {
-        return this.pool.filter(p => p.active && p.isEnemy);
+        return this._cachedEnemy;
+    }
+
+    // Rebuild cached lists once per frame during update
+    _rebuildCache() {
+        this._cachedActive = [];
+        this._cachedPlayer = [];
+        this._cachedEnemy = [];
+        for (let i = 0; i < this.pool.length; i++) {
+            const p = this.pool[i];
+            if (!p.active) continue;
+            this._cachedActive.push(p);
+            if (p.isEnemy) this._cachedEnemy.push(p);
+            else this._cachedPlayer.push(p);
+        }
     }
 }

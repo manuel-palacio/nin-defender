@@ -24,7 +24,11 @@ const Utils = {
     },
 
     circleCollision(x1, y1, r1, x2, y2, r2) {
-        return Utils.distance(x1, y1, x2, y2) < r1 + r2;
+        // AABB pre-check to skip expensive sqrt
+        const totalR = r1 + r2;
+        if (Math.abs(x1 - x2) > totalR || Math.abs(y1 - y2) > totalR) return false;
+        const dx = x2 - x1, dy = y2 - y1;
+        return dx * dx + dy * dy < totalR * totalR;
     },
 
     lerp(a, b, t) {

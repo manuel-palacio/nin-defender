@@ -83,6 +83,9 @@ class Game {
         this.shop = new Shop();
         this.scrapPulse = 0;
 
+        // Pre-rendered scan lines overlay
+        this._scanCanvas = null;
+
         // Menu animation
         this.menuTime = 0;
     }
@@ -159,6 +162,19 @@ class Game {
         this.leaderboard.sort((a, b) => b.score - a.score);
         this.leaderboard = this.leaderboard.slice(0, 10);
         localStorage.setItem('ninDefenderLeaderboard', JSON.stringify(this.leaderboard));
+    }
+
+    _getScanLines(w, h) {
+        if (this._scanCanvas && this._scanCanvas.width === w && this._scanCanvas.height === h) {
+            return this._scanCanvas;
+        }
+        this._scanCanvas = document.createElement('canvas');
+        this._scanCanvas.width = w;
+        this._scanCanvas.height = h;
+        const sCtx = this._scanCanvas.getContext('2d');
+        sCtx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        for (let y = 0; y < h; y += 4) sCtx.fillRect(0, y, w, 2);
+        return this._scanCanvas;
     }
 
     resize(w, h) {
@@ -1007,11 +1023,8 @@ class Game {
             ctx.fillRect(0, 0, w, h);
         }
 
-        // Subtle scan lines effect
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        for (let y = 0; y < h; y += 4) {
-            ctx.fillRect(0, y, w, 2);
-        }
+        // Scan lines (pre-rendered)
+        ctx.drawImage(this._getScanLines(w, h), 0, 0);
 
         // Title — NIN DEFENDER in harsh red
         ctx.textAlign = 'center';
@@ -1121,9 +1134,8 @@ class Game {
             ctx.fillStyle = 'rgba(5, 5, 5, 0.85)';
             ctx.fillRect(0, 0, w, h);
         }
-        // Scan lines
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 2);
+        // Scan lines (pre-rendered)
+        ctx.drawImage(this._getScanLines(w, h), 0, 0);
 
         ctx.textAlign = 'center';
 
