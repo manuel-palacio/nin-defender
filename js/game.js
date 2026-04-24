@@ -6,6 +6,7 @@ const STATE = {
     MENU:      'MENU',
     PLAYING:   'PLAYING',
     PAUSED:    'PAUSED',
+    SHOP:      'SHOP',
     GAME_OVER: 'GAME_OVER'
 };
 
@@ -77,6 +78,10 @@ class Game {
         // Easter egg code buffer
         this._codeBuffer = '';
         this._codeTimer = 0;
+
+        // Upgrade shop
+        this.shop = new Shop();
+        this.scrapPulse = 0;
 
         // Menu animation
         this.menuTime = 0;
@@ -167,6 +172,18 @@ class Game {
         this.keys[code] = true;
         this._checkEasterEgg(code);
 
+        // Shop controls
+        if (this.state === STATE.SHOP) {
+            if (code === 'ArrowUp' || code === 'KeyW') this.shop.moveUp();
+            if (code === 'ArrowDown' || code === 'KeyS') this.shop.moveDown();
+            if (code === 'Space') this.shop.tryPurchase(this.player);
+            if (code === 'Enter') {
+                this.state = STATE.PLAYING;
+                this.spawner.timer = 2.0; // brief grace after shop
+            }
+            return;
+        }
+
         if (code === 'KeyP' || code === 'Escape') {
             if (this.state === STATE.PLAYING || this.state === STATE.PAUSED) {
                 this.pause();
@@ -241,6 +258,12 @@ class Game {
         }
 
         if (this.state === STATE.PAUSED) return;
+
+        if (this.state === STATE.SHOP) {
+            this.shop.update(dt);
+            this.background.update(dt);
+            return;
+        }
 
         if (this.state === STATE.GAME_OVER) {
             this.background.update(dt);
@@ -337,10 +360,14 @@ class Game {
         }
         if (this.phaseAnnounceTimer > 0) this.phaseAnnounceTimer -= dt;
 
-        // Check if boss is still alive
+        // Check if boss is still alive — open shop when boss dies
         if (this.bossActive) {
             const bossAlive = this.spawner.enemies.some(e => e.type === 'boss' && e.active);
-            if (!bossAlive) this.bossActive = false;
+            if (!bossAlive) {
+                this.bossActive = false;
+                this.state = STATE.SHOP;
+                this.shop.selectedIndex = 0;
+            }
         }
 
         // Environmental hazards — less frequent in easy phases, more frequent later
@@ -501,6 +528,7 @@ class Game {
                         this.score += Math.floor(e.points * multiplier);
                         // Scrap drops (1-3 per kill)
                         this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
+                        this.scrapPulse = 1.0;
 
                         // Asteroid spider burst — only after phase 4, 15% chance
                         if (e.type === 'asteroid' && this.lastPhase >= 4 && Math.random() < 0.15) {
@@ -702,6 +730,7 @@ class Game {
 
         if (this.state === STATE.MENU)      this.drawMenu(ctx);
         if (this.state === STATE.PAUSED)     this.drawPause(ctx);
+        if (this.state === STATE.SHOP)       this.shop.draw(ctx, this.canvas, this.player);
         if (this.state === STATE.GAME_OVER)  this.drawGameOver(ctx);
     }
 
@@ -723,9 +752,13 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.fillText(`HI: ${this.highScore}`, 16, 54);
 
-        // Scrap counter
-        ctx.fillStyle = '#993300';
+        // Scrap counter with pulse on gain
+        if (this.scrapPulse > 0) this.scrapPulse -= 0.02;
+        const scrapGlow = Math.max(0, this.scrapPulse);
+        ctx.fillStyle = scrapGlow > 0 ? `rgb(${153 + Math.floor(102 * scrapGlow)}, ${51 + Math.floor(153 * scrapGlow)}, 0)` : '#993300';
+        if (scrapGlow > 0) { ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 8 * scrapGlow; }
         ctx.fillText(`SCRAP: ${this.player.scrap}`, 16, 70);
+        ctx.shadowBlur = 0;
 
         // Combo display
         if (this.player.combo >= 3) {
@@ -1134,6 +1167,13 @@ class Game {
                 ctx.fillStyle = i === 0 ? '#cc0000' : '#444';
                 ctx.fillText(`${i + 1}. ${entry.score}`, w / 2, h * 0.73 + 16 + i * 14);
             }
+        }
+
+        // Scrap available hint
+        if (this.player.scrap > 0) {
+            ctx.font = '12px Courier New';
+            ctx.fillStyle = '#993300';
+            ctx.fillText(`SCRAP AVAILABLE: ${this.player.scrap} — spend it next run`, w / 2, h * 0.88);
         }
 
         const pulse = 0.4 + 0.6 * Math.sin(this.menuTime * 2.5);

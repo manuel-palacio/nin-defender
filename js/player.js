@@ -75,10 +75,12 @@ class Player {
         // Scrap & weapon upgrades (persistent via localStorage)
         this.scrap = parseInt(localStorage.getItem('ninDefenderScrap') || '0', 10);
         this.upgrades = JSON.parse(localStorage.getItem('ninDefenderUpgrades') || '{}');
-        this.upgrades.damage   = this.upgrades.damage   || 0; // 0-5 levels
+        this.upgrades.damage   = this.upgrades.damage   || 0;
         this.upgrades.fireRate = this.upgrades.fireRate || 0;
         this.upgrades.speed    = this.upgrades.speed    || 0;
         this.upgrades.bombs    = this.upgrades.bombs    || 0;
+        this.upgrades.shields  = this.upgrades.shields  || 0;
+        this.upgrades.lives    = this.upgrades.lives    || 0;
         this.applyUpgrades();
 
         // Trail customization
@@ -191,11 +193,15 @@ class Player {
         const frLevel  = this.upgrades ? this.upgrades.fireRate : 0;
         const spdLevel = this.upgrades ? this.upgrades.speed : 0;
         const bmbLevel = this.upgrades ? this.upgrades.bombs : 0;
-        this.baseDamage = 1 + dmgLevel * 0.5;        // 1 → 3.5 at max
-        this.baseFireRate = 0.18 - frLevel * 0.015;   // 0.18 → 0.105 at max
+        this.baseDamage = 1 + dmgLevel * 0.5;
+        this.baseFireRate = 0.18 - frLevel * 0.015;
         this.fireRate = this.baseFireRate;
-        this.speed = 420 + spdLevel * 30;             // 420 → 570 at max
-        this.maxBombs = 2 + bmbLevel;                 // 2 → 7 at max
+        this.speed = 420 + spdLevel * 30;
+        this.maxBombs = 2 + bmbLevel;
+        const shdLevel = this.upgrades ? this.upgrades.shields : 0;
+        const livLevel = this.upgrades ? this.upgrades.lives : 0;
+        this.maxShieldCharges = 3 + shdLevel;
+        this.maxLives = 8 + livLevel;
     }
 
     addScrap(amount) {
