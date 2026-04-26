@@ -144,6 +144,8 @@ class Game {
         // Boss & hazards
         this.bossActive = false;
         this.bossSpawnedForPhase = -1;
+        this._waveClearTimer = 0;
+        this._waveClearPhase = 0;
         this.hazardTimer = Utils.random(60, 90);
         this.solarFlare = new SolarFlare();
         this.blackHole = new BlackHole();
