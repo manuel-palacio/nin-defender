@@ -98,9 +98,8 @@ All purchases persist across games via localStorage.
 - **Power Combo** — stacking 2+ power-ups gives 2x-3x score multiplier
 
 ### Environment
-- Midjourney-generated planet sprites (frozen lava planet, red Mars, alien moon)
-- Canvas fallback planets (Gas Giant, Ringed Planet)
-- NIN logos on procedural planets
+- Celestial bodies: Midjourney moon sprite + procedural canvas planets (Mars, Gas Giant, Ice Planet, Ringed Planet)
+- NIN logos on planet surfaces
 - 3-layer parallax starfield
 - Environmental hazards: solar flares, black holes (bend all bullets), asteroid belts
 
@@ -139,7 +138,7 @@ All purchases persist across games via localStorage.
 - Nginx Alpine (Docker)
 - Fly.io (deployment, 2 machines, auto-sleep)
 - ImageMagick (sprite processing)
-- Midjourney (planet and ship sprite generation)
+- Midjourney (ship sprite generation)
 
 ## Run Locally
 
@@ -182,6 +181,6 @@ Lyrics sourced from each song and displayed in-game when that song is playing.
 ## Credits
 
 - Music: Nine Inch Nails remixes sourced from the now-defunct **remix.nin.com** (official NIN remix site)
-- Planet sprites: Generated with Midjourney
+- Moon sprite: Generated with Midjourney
 - Player ship sprite: Generated with Midjourney
 - Everything else: HTML5 Canvas + vanilla JS

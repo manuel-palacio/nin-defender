@@ -166,19 +166,18 @@ class Moon {
 
         ctx.save();
 
-        // Moon sprite — use alienMoon or moon asset
-        const moonImg = this.assets.alienMoon || this.assets.moon;
+        // Moon sprite
+        const moonImg = this.assets.moon;
         if (moonImg) {
-            const img = moonImg;
             const drawSize = r * 2.4;
-            const drawW = drawSize * (img.width / img.height);
+            const drawW = drawSize * (moonImg.width / moonImg.height);
             ctx.globalAlpha = 0.9;
-            ctx.drawImage(img, x - drawW / 2, y - drawSize / 2, drawW, drawSize);
+            ctx.drawImage(moonImg, x - drawW / 2, y - drawSize / 2, drawW, drawSize);
             ctx.restore();
             return;
         }
 
-        // Moon body — subtle gradient (Canvas fallback)
+        // Moon body — subtle gradient
         const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
         grad.addColorStop(0, '#e8e0d0');
         grad.addColorStop(0.6, '#c4b89a');
@@ -313,16 +312,6 @@ class Mars {
         const r = this.radius;
 
         ctx.save();
-
-        // Sprite rendering if available
-        if (this.assets.planetRed) {
-            const img = this.assets.planetRed;
-            const drawSize = r * 2.4;
-            ctx.globalAlpha = 0.85;
-            ctx.drawImage(img, x - drawSize / 2, y - drawSize / 2, drawSize, drawSize);
-            ctx.restore();
-            return;
-        }
 
         // Planet body — rusty red gradient
         const grad = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.05, x, y, r);
@@ -516,20 +505,6 @@ class IcePlanet {
         const r = this.radius;
 
         ctx.save();
-
-        // Sprite rendering — use alienMoon or planetIce if available
-        if (!this._iceSprite) {
-            const icePlanets = [this.assets.planetIce, this.assets.planetIce2, this.assets.alienMoon].filter(Boolean);
-            this._iceSprite = icePlanets.length > 0 ? icePlanets[Math.floor(Math.random() * icePlanets.length)] : null;
-        }
-        const iceSprite = this._iceSprite;
-        if (iceSprite) {
-            const drawSize = r * 2.4;
-            ctx.globalAlpha = 0.85;
-            ctx.drawImage(iceSprite, x - drawSize / 2, y - drawSize / 2, drawSize, drawSize);
-            ctx.restore();
-            return;
-        }
 
         // Planet body — icy blue
         const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.3, r * 0.05, x, y, r);
