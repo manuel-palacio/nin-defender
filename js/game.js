@@ -3,11 +3,12 @@
 // ============================================================
 
 const STATE = {
-    MENU:      'MENU',
-    PLAYING:   'PLAYING',
-    PAUSED:    'PAUSED',
-    SHOP:      'SHOP',
-    GAME_OVER: 'GAME_OVER'
+    MENU:       'MENU',
+    PLAYING:    'PLAYING',
+    PAUSED:     'PAUSED',
+    SHOP:       'SHOP',
+    WAVE_CLEAR: 'WAVE_CLEAR',
+    GAME_OVER:  'GAME_OVER'
 };
 
 class Game {
@@ -91,6 +92,10 @@ class Game {
         this._bossKillX = 0;
         this._bossKillY = 0;
         this._bossKillStage = 0;
+
+        // Wave clear banner
+        this._waveClearTimer = 0;
+        this._waveClearPhase = 0;
 
         // Pause menu
         this._pauseMenuIndex = 0;
