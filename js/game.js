@@ -367,6 +367,13 @@ class Game {
 
         // Player — always on real dt
         this.player.update(dt, this.keys, this.joystick);
+        // Combo loss flourish — small flash burst when a high streak (>= 10)
+        // expires, so the player notices what they just lost.
+        if (this.player._comboResetFrom >= 10) {
+            this.particles.createColorExplosion(this.player.x, this.player.y,
+                ['#ff2200', '#ffaa00', '#ffffff'], 18, 200, 0.5, 4);
+            this.shake.shake(2, 0.1);
+        }
         this.player.drawTrail(this.particles);
 
         // Auto-fire if key held or touch — apply micro shake + recoil per shot.

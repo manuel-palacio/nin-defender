@@ -603,10 +603,13 @@ class Player {
         // Bomb cooldown
         if (this.bombCooldown > 0) this.bombCooldown -= dt;
 
-        // Combo timer
+        // Combo timer — record the prior count on reset so game.js can spawn
+        // a flourish if the player just lost a high streak.
+        this._comboResetFrom = 0;
         if (this.comboTimer > 0) {
             this.comboTimer -= dt;
             if (this.comboTimer <= 0) {
+                this._comboResetFrom = this.combo;
                 this.combo = 0;
             }
         }
@@ -915,6 +918,33 @@ class Player {
         }
 
         ctx.restore();
+
+        // Combo arc — drawn in screen space (no ship tilt) so it reads as a
+        // stable HUD element. Hidden until combo crosses the multiplier
+        // threshold (>= 3); pulses faster as the timer drains.
+        if (this.combo >= 3 && this.comboTimer > 0) {
+            const frac = Math.max(0, this.comboTimer / this.comboDuration);
+            const mult = this.getComboMultiplier();
+            const arcColor = mult >= 4 ? '#ff2200' : mult >= 2 ? '#ffaa00' : '#00cc44';
+            // Heartbeat picks up as the window closes (1Hz at full → ~5Hz near zero)
+            const beatRate = 1 + (1 - frac) * 4;
+            const pulse = 0.7 + 0.3 * Math.sin(this.engineTime * Math.PI * 2 * beatRate);
+            const radius = this.radius + 14;
+            const lineW = (1.5 + Math.min(4, mult * 0.6)) * pulse;
+
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.strokeStyle = arcColor;
+            ctx.shadowColor = arcColor;
+            ctx.shadowBlur = 8;
+            ctx.lineWidth = lineW;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            const start = -Math.PI / 2;
+            ctx.arc(0, 0, radius, start, start + Math.PI * 2 * frac);
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
     drawTrail(particles) {
