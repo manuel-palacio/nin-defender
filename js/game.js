@@ -30,6 +30,7 @@ class Game {
         this.background = new Background(canvas, this.assets);
         this.particles = new ParticlePool(1200);
         this.projectiles = new ProjectilePool(200);
+        this.anim = new Anim({ shake: this.shake, particles: this.particles, audio: this.audio });
         this.spawner = new EnemySpawner(this.assets);
         this.player = new Player(canvas, this.assets);
         this.powerups = [];
@@ -57,12 +58,9 @@ class Game {
         this.time = 0;
         this.powerupTimer = 0;
 
-        // Phase announcement
+        // Phase announcement (visible-state lives on this.anim.phaseBanner)
         this.lastPhase = -1;
-        this.phaseAnnounceTimer = 0;
-        this.phaseAnnounceName = '';
         this.phaseStartTime = 0; // for speed run timer
-        this.phaseAnnounceColor = '#ffffff';
 
         // NIN quotes
         this.quoteText = '';
@@ -87,15 +85,8 @@ class Game {
         // Pre-rendered scan lines overlay
         this._scanCanvas = null;
 
-        // Boss kill cinematic
-        this._bossKillTimer = 0;
-        this._bossKillX = 0;
-        this._bossKillY = 0;
-        this._bossKillStage = 0;
-
-        // Wave clear banner
-        this._waveClearTimer = 0;
-        this._waveClearPhase = 0;
+        // GSAP-driven cinematic time source (monotonic; pauses with the game)
+        this.gameTime = 0;
 
         // Pause menu
         this._pauseMenuIndex = 0;
@@ -111,12 +102,17 @@ class Game {
 
         // Menu animation
         this.menuTime = 0;
+
+        // Start menu idle loops (state begins as MENU)
+        this.anim.startMenuLoops();
     }
 
     // ----- State transitions -----
     startGame() {
         this.audio.init();
         this.audio.resume();
+        this.anim.killAll();
+        this.anim.stopMenuLoops();
         this.state = STATE.PLAYING;
         this.score = 0;
         this.time = 0;
@@ -131,12 +127,12 @@ class Game {
         this._bulletSpeedMul = diff.bulletSpeedMul;
         this.projectiles = new ProjectilePool(200);
         this.particles = new ParticlePool(1200);
+        this.anim.particles = this.particles; // keep cinematic FX bound to current pool
         this.powerups = [];
         // Randomize celestial body each new game
         this.background = new Background(this.canvas, this.assets);
         // Reset quotes and phases
         this.lastPhase = -1;
-        this.phaseAnnounceTimer = 0;
         this.quoteText = '';
         this.quoteTimer = 0;
         this.quoteInterval = Utils.random(3, 6);
@@ -144,8 +140,6 @@ class Game {
         // Boss & hazards
         this.bossActive = false;
         this.bossSpawnedForPhase = -1;
-        this._waveClearTimer = 0;
-        this._waveClearPhase = 0;
         this.hazardTimer = Utils.random(60, 90);
         this.solarFlare = new SolarFlare();
         this.blackHole = new BlackHole();
@@ -173,6 +167,7 @@ class Game {
     }
 
     gameOver() {
+        this.anim.killAll();
         this.state = STATE.GAME_OVER;
         if (this.score > this.highScore) {
             this.highScore = this.score;
@@ -258,6 +253,8 @@ class Game {
                 if (this._pauseMenuIndex === 0) this.pause(); // resume
                 else if (this._pauseMenuIndex === 1) this.startGame(); // restart
                 else if (this._pauseMenuIndex === 2) { // main menu
+                    this.anim.killAll();
+                    this.anim.startMenuLoops();
                     this.state = STATE.MENU;
                     if (this.music) this.music.stop();
                     this.menuMusic.currentTime = 0;
@@ -272,10 +269,12 @@ class Game {
             if (code === 'ArrowLeft' || code === 'KeyA') {
                 this.difficultyIndex = (this.difficultyIndex - 1 + 3) % 3;
                 localStorage.setItem('ninDefenderDifficulty', this.difficultyIndex.toString());
+                this.anim.popDifficulty();
             }
             if (code === 'ArrowRight' || code === 'KeyD') {
                 this.difficultyIndex = (this.difficultyIndex + 1) % 3;
                 localStorage.setItem('ninDefenderDifficulty', this.difficultyIndex.toString());
+                this.anim.popDifficulty();
             }
         }
 
@@ -314,9 +313,7 @@ class Game {
                 this.player.lives = this.player.maxLives;
                 this.player.invincible = true;
                 this.player.invincibleTimer = 30;
-                this.phaseAnnounceName = 'GOD MODE';
-                this.phaseAnnounceColor = '#cc0000';
-                this.phaseAnnounceTimer = 2.0;
+                this.anim.phaseAnnounce('GOD MODE', { color: '#cc0000', duration: 2.0 });
                 this._codeBuffer = '';
             } else if (this._codeBuffer.endsWith('CLOSER')) {
                 // Spawn a max-level boss
@@ -324,9 +321,7 @@ class Game {
                 boss.canvas_w = this.canvas.width;
                 this.spawner.enemies.push(boss);
                 this.bossActive = true;
-                this.phaseAnnounceName = 'CLOSER';
-                this.phaseAnnounceColor = '#ff2200';
-                this.phaseAnnounceTimer = 2.0;
+                this.anim.phaseAnnounce('CLOSER', { color: '#ff2200', duration: 2.0 });
                 this._codeBuffer = '';
             }
 
@@ -340,6 +335,12 @@ class Game {
     // ----- Main update -----
     update(dt) {
         this.menuTime += dt;
+
+        // Drive GSAP from gameTime so cinematics freeze when the game pauses.
+        if (this.state !== STATE.PAUSED) {
+            this.gameTime += dt;
+            this.anim.tick(this.gameTime);
+        }
 
         if (this.state === STATE.MENU) {
             this.background.update(dt);
@@ -355,13 +356,9 @@ class Game {
         }
 
         if (this.state === STATE.WAVE_CLEAR) {
-            this._waveClearTimer -= dt;
             this.background.update(dt);
             this.particles.update(dt);
-            if (this._waveClearTimer <= 0) {
-                this.state = STATE.SHOP;
-                this.shop.selectedIndex = 0;
-            }
+            // Transition to SHOP fires from waveClearBanner's onComplete callback.
             return;
         }
 
@@ -433,9 +430,8 @@ class Game {
         if (currentPhase !== this.lastPhase) {
             this.lastPhase = currentPhase;
             const phaseInfo = PHASES[currentPhase];
-            this.phaseAnnounceName = phaseInfo.name;
-            this.phaseAnnounceColor = phaseInfo.color;
-            this.phaseAnnounceTimer = 4.0;
+            this.anim.phaseAnnounce(phaseInfo.name,
+                { color: phaseInfo.color, duration: 4.0 });
             this.phaseStartTime = this.time;
 
             // Clear all non-boss enemies for a clean phase transition
@@ -466,64 +462,10 @@ class Game {
                 this.bossActive = true;
             }
         }
-        if (this.phaseAnnounceTimer > 0) this.phaseAnnounceTimer -= dt;
-
         // Check if boss is still alive
         if (this.bossActive) {
             const bossAlive = this.spawner.enemies.some(e => e.type === 'boss' && e.active);
             if (!bossAlive) this.bossActive = false;
-        }
-
-        // Boss kill cinematic — staged explosions before shop
-        if (this._bossKillTimer > 0) {
-            this._bossKillTimer -= dt;
-            const elapsed = 2.0 - this._bossKillTimer;
-            const bx = this._bossKillX;
-            const by = this._bossKillY;
-
-            // Stage 0: initial burst (0.0s)
-            if (this._bossKillStage === 0) {
-                this._bossKillStage = 1;
-                this.shake.shake(20, 0.5);
-                this.particles.createColorExplosion(bx, by,
-                    ['#ffffff', '#ffdd00', '#ff8800'], 40, 400, 1.0, 7);
-            }
-            // Stage 1: secondary explosions (0.3s)
-            if (this._bossKillStage === 1 && elapsed > 0.3) {
-                this._bossKillStage = 2;
-                this.shake.shake(15, 0.3);
-                this.particles.createColorExplosion(bx + Utils.random(-30, 30), by + Utils.random(-30, 30),
-                    ['#ff3366', '#ff6600', '#ffffff'], 30, 350, 0.8, 6);
-                this.audio.playExplosion();
-            }
-            // Stage 2: ring explosion (0.7s)
-            if (this._bossKillStage === 2 && elapsed > 0.7) {
-                this._bossKillStage = 3;
-                this.shake.shake(12, 0.3);
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    const rx = bx + Math.cos(angle) * 50;
-                    const ry = by + Math.sin(angle) * 50;
-                    this.particles.createColorExplosion(rx, ry,
-                        ['#cc0000', '#ff4400', '#ffaa00'], 15, 250, 0.6, 4);
-                }
-                this.audio.playExplosion();
-            }
-            // Stage 3: final flash (1.2s)
-            if (this._bossKillStage === 3 && elapsed > 1.2) {
-                this._bossKillStage = 4;
-                this.shake.shake(25, 0.4);
-                this.particles.createColorExplosion(bx, by,
-                    ['#ffffff', '#ffffff', '#ffddaa'], 60, 500, 1.2, 8);
-                this.audio.playExplosion();
-            }
-            // Show wave clear banner after cinematic ends
-            if (this._bossKillTimer <= 0) {
-                this._bossKillStage = 0;
-                this.state = STATE.WAVE_CLEAR;
-                this._waveClearTimer = 2.5;
-                this._waveClearPhase = this.lastPhase;
-            }
         }
 
         // Environmental hazards — less frequent in easy phases, more frequent later
@@ -761,12 +703,16 @@ class Game {
                         this.shake.shake(fx.shake, 0.15);
                         this.audio.playExplosion();
 
-                        // Boss kill — trigger cinematic
+                        // Boss kill — trigger cinematic, then wave-clear banner, then shop.
                         if (e.type === 'boss') {
-                            this._bossKillTimer = 2.0;
-                            this._bossKillX = e.x;
-                            this._bossKillY = e.y;
-                            this._bossKillStage = 0;
+                            const phase = this.lastPhase;
+                            this.anim.bossKillCinematic(e.x, e.y, () => {
+                                this.state = STATE.WAVE_CLEAR;
+                                this.anim.waveClearBanner(phase, () => {
+                                    this.state = STATE.SHOP;
+                                    this.shop.selectedIndex = 0;
+                                });
+                            });
                         }
 
                         // Chain explosion — damage nearby enemies
@@ -1010,17 +956,18 @@ class Game {
             puY += 18;
         }
 
-        // Phase announcement — center screen, fading
-        if (this.phaseAnnounceTimer > 0) {
-            const fadeAlpha = Math.min(1, this.phaseAnnounceTimer / 0.5);
+        // Phase announcement — center screen, fading (driven by GSAP via Anim)
+        if (this.anim.phaseBanner.visible) {
+            const pb = this.anim.phaseBanner;
             ctx.save();
-            ctx.globalAlpha = fadeAlpha;
+            ctx.globalAlpha = pb.alpha;
             ctx.textAlign = 'center';
-            ctx.font = `bold ${Math.min(w * 0.035, 28)}px Courier New`;
-            ctx.fillStyle = '#cc0000';
-            ctx.shadowColor = '#cc0000';
+            const baseSize = Math.min(w * 0.035, 28);
+            ctx.font = `bold ${baseSize * pb.scale}px Courier New`;
+            ctx.fillStyle = pb.color;
+            ctx.shadowColor = pb.color;
             ctx.shadowBlur = 12;
-            ctx.fillText(`— ${this.phaseAnnounceName} —`, w / 2, h * 0.15);
+            ctx.fillText(`— ${pb.text} —`, w / 2, h * 0.15);
             ctx.font = '13px Courier New';
             ctx.fillStyle = '#666';
             ctx.shadowBlur = 0;
@@ -1029,7 +976,7 @@ class Game {
         }
 
         // Current phase indicator + speed run timer — top center
-        if (this.lastPhase >= 0 && this.phaseAnnounceTimer <= 0) {
+        if (this.lastPhase >= 0 && !this.anim.phaseBanner.visible) {
             ctx.font = 'bold 13px Courier New';
             ctx.textAlign = 'center';
             ctx.fillStyle = '#888';
@@ -1044,7 +991,7 @@ class Game {
         }
 
         // NIN quote — words flash one at a time at random positions
-        if (this.quoteTimer > 0 && this.phaseAnnounceTimer <= 0 && !this.bossActive && h > 350) {
+        if (this.quoteTimer > 0 && !this.anim.phaseBanner.visible && !this.bossActive && h > 350) {
             const elapsed = this.quoteDuration - this.quoteTimer;
             const words = this.quoteText.split(' ');
             // Scale word timing so long quotes still fit within ~8 seconds
@@ -1184,15 +1131,17 @@ class Game {
         // Scan lines (pre-rendered)
         ctx.drawImage(this._getScanLines(w, h), 0, 0);
 
-        // Title — NIN DEFENDER in harsh red
+        // Title — NIN DEFENDER in harsh red, GSAP-driven pulse via Anim.menuTitle
+        const mt = this.anim.menuTitle;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#cc0000';
         ctx.shadowColor = '#cc0000';
-        ctx.shadowBlur = 25;
-        ctx.font = `bold ${Math.min(w * 0.08, 64)}px Courier New`;
+        ctx.shadowBlur = mt.glow;
+        const titleSize = Math.min(w * 0.08, 64) * mt.scale;
+        ctx.font = `bold ${titleSize}px Courier New`;
         ctx.fillText('NIN DEFENDER', w / 2, h * 0.3);
         // Double-strike for glow intensity
-        ctx.shadowBlur = 40;
+        ctx.shadowBlur = mt.glow * 1.6;
         ctx.globalAlpha = 0.3;
         ctx.fillText('NIN DEFENDER', w / 2, h * 0.3);
         ctx.globalAlpha = 1;
@@ -1203,21 +1152,21 @@ class Game {
         ctx.fillStyle = '#999';
         ctx.fillText('NOTHING CAN STOP ME NOW', w / 2, h * 0.3 + 35);
 
-        // Pulsing start prompt
-        const pulse = 0.4 + 0.6 * Math.sin(this.menuTime * 2.5);
-        ctx.globalAlpha = pulse;
+        // Pulsing start prompt — GSAP-driven via Anim.menuPrompt
+        ctx.globalAlpha = this.anim.menuPrompt.alpha;
         ctx.font = `bold ${Math.min(w * 0.025, 18)}px Courier New`;
         ctx.fillStyle = '#cc0000';
         ctx.fillText('[ PRESS SPACE ]', w / 2, h * 0.5);
         ctx.globalAlpha = 1;
 
-        // Difficulty selector
+        // Difficulty selector — current selection scale-pops on change
         ctx.font = 'bold 14px Courier New';
         const diffY = h * 0.56;
         const diffColors = ['#00cc44', '#cc8800', '#cc0000'];
         ctx.fillStyle = '#555';
         ctx.fillText('< DIFFICULTY >', w / 2, diffY);
-        ctx.font = `bold 16px Courier New`;
+        const diffScale = this.anim.menuDifficulty.scale;
+        ctx.font = `bold ${16 * diffScale}px Courier New`;
         ctx.fillStyle = diffColors[this.difficultyIndex];
         ctx.fillText(this.difficulties[this.difficultyIndex], w / 2, diffY + 20);
         ctx.globalAlpha = 1;
@@ -1266,20 +1215,20 @@ class Game {
         ctx.restore();
     }
 
-    // ----- Wave Clear banner ----- (gold reward moment)
+    // ----- Wave Clear banner ----- (gold reward moment, GSAP-driven)
     drawWaveClear(ctx) {
+        if (!this.anim.waveBanner.visible) return;
         const w = this.canvas.width;
         const h = this.canvas.height;
-
-        // Fade out over the last 0.5 seconds
-        const alpha = Math.min(1, this._waveClearTimer / 0.5);
+        const wb = this.anim.waveBanner;
 
         ctx.save();
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = wb.alpha;
         ctx.textAlign = 'center';
 
-        // Main text — gold with glow
-        ctx.font = `bold ${Math.min(w * 0.05, 40)}px Courier New`;
+        // Main text — gold with glow, scale-pop on entry
+        const baseSize = Math.min(w * 0.05, 40);
+        ctx.font = `bold ${baseSize * wb.scale}px Courier New`;
         ctx.fillStyle = '#ffdd00';
         ctx.shadowColor = '#ffdd00';
         ctx.shadowBlur = 15;
@@ -1289,7 +1238,7 @@ class Game {
         ctx.shadowBlur = 0;
         ctx.font = '13px Courier New';
         ctx.fillStyle = '#aa8800';
-        ctx.fillText(`PHASE ${this._waveClearPhase + 1} COMPLETE`, w / 2, h * 0.4 + 35);
+        ctx.fillText(`PHASE ${wb.phase + 1} COMPLETE`, w / 2, h * 0.4 + 35);
 
         ctx.restore();
     }
