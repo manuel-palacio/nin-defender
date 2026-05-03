@@ -117,6 +117,21 @@ class UIRenderer {
             ctx.fillText(`WINGMAN ${Math.ceil(g.player.wingmanTimer)}s`, 16, puY);
             puY += 18;
         }
+        if (g.player.timeWarp) {
+            ctx.fillStyle = '#00ddff';
+            ctx.fillText(`TIME WARP ${Math.ceil(g.player.timeWarpTimer)}s`, 16, puY);
+            puY += 18;
+        }
+        if (g.player.laserBeam) {
+            ctx.fillStyle = '#ff0066';
+            ctx.fillText(`LASER BEAM ${Math.ceil(g.player.laserBeamTimer)}s`, 16, puY);
+            puY += 18;
+        }
+        if (g.player.nukeOvercharge) {
+            ctx.fillStyle = '#ff4400';
+            ctx.fillText(`NUKE READY`, 16, puY);
+            puY += 18;
+        }
         // Power combo indicator
         const puCount = g.player.getActivePowerUpCount();
         if (puCount >= 2) {

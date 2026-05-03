@@ -3,12 +3,15 @@
 // ============================================================
 
 const POWERUP_TYPES = {
-    RAPID_FIRE:  { name: 'Rapid Fire',  color: '#ffdd00', duration: 8 },
-    TRIPLE_SHOT: { name: 'Triple Shot', color: '#00ff66', duration: 10 },
-    SHIELD:      { name: 'Shield',      color: '#00aaff', duration: 12 },
-    EXTRA_LIFE:  { name: 'Extra Life',  color: '#ff66cc', duration: 0 },
-    RICOCHET:    { name: 'Ricochet',   color: '#ff8800', duration: 12 },
-    WINGMAN:     { name: 'Wingman',    color: '#4488ff', duration: 15 }
+    RAPID_FIRE:      { name: 'Rapid Fire',     color: '#ffdd00', duration: 8 },
+    TRIPLE_SHOT:     { name: 'Triple Shot',    color: '#00ff66', duration: 10 },
+    SHIELD:          { name: 'Shield',         color: '#00aaff', duration: 12 },
+    EXTRA_LIFE:      { name: 'Extra Life',     color: '#ff66cc', duration: 0 },
+    RICOCHET:        { name: 'Ricochet',       color: '#ff8800', duration: 12 },
+    WINGMAN:         { name: 'Wingman',        color: '#4488ff', duration: 15 },
+    TIME_WARP:       { name: 'Time Warp',      color: '#00ddff', duration: 4 },
+    LASER_BEAM:      { name: 'Laser Beam',     color: '#ff0066', duration: 5 },
+    NUKE_OVERCHARGE: { name: 'Nuke Overcharge', color: '#ff4400', duration: 30 }
 };
 
 const POWERUP_KEYS = Object.keys(POWERUP_TYPES);
@@ -96,12 +99,15 @@ class PowerUp {
             ctx.textBaseline = 'middle';
 
             let icon = '?';
-            if (this.type === 'RAPID_FIRE')  icon = 'R';
-            if (this.type === 'TRIPLE_SHOT') icon = 'T';
-            if (this.type === 'SHIELD')      icon = 'S';
-            if (this.type === 'EXTRA_LIFE')  icon = '+';
-            if (this.type === 'RICOCHET')    icon = 'B';
-            if (this.type === 'WINGMAN')     icon = 'W';
+            if (this.type === 'RAPID_FIRE')      icon = 'R';
+            if (this.type === 'TRIPLE_SHOT')     icon = 'T';
+            if (this.type === 'SHIELD')          icon = 'S';
+            if (this.type === 'EXTRA_LIFE')      icon = '+';
+            if (this.type === 'RICOCHET')        icon = 'B';
+            if (this.type === 'WINGMAN')         icon = 'W';
+            if (this.type === 'TIME_WARP')       icon = '◔';
+            if (this.type === 'LASER_BEAM')      icon = 'L';
+            if (this.type === 'NUKE_OVERCHARGE') icon = 'N';
             ctx.fillText(icon, this.x, this.y + 1);
         }
 

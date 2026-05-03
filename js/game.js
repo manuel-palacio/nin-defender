@@ -86,6 +86,9 @@ class Game {
         // GSAP-driven cinematic time source (monotonic; pauses with the game)
         this.gameTime = 0;
 
+        // Laser Beam render geometry — null when no beam is firing
+        this._laserBeam = null;
+
         // Pause menu
         this._pauseMenuIndex = 0;
 
@@ -355,10 +358,14 @@ class Game {
 
         // --- PLAYING ---
         this.time += dt;
-        this.background.update(dt);
+        // Time Warp slows the world (enemies, bullets, particles, hazards) but not the
+        // player or spawn timers — the player should feel responsive while everything
+        // around them drifts. Spawn rates stay on real dt so warp doesn't starve you.
+        const worldDt = this.player.timeWarp ? dt * 0.3 : dt;
+        this.background.update(worldDt);
         this.shake.update(dt);
 
-        // Player
+        // Player — always on real dt
         this.player.update(dt, this.keys, this.joystick);
         this.player.drawTrail(this.particles);
 
@@ -390,6 +397,31 @@ class Game {
             }
         }
 
+        // Laser Beam — sustained hitscan ray. Damages all enemies in a horizontal
+        // band ahead of the player; renderer reads this._laserBeam to draw the line.
+        if (this.player.laserBeam) {
+            const beamX = this.player.x + this.player.width / 2;
+            const beamY = this.player.y;
+            const beamHalfWidth = 14;
+            const dmgPerSec = 3;
+            const dmgThisFrame = dmgPerSec * dt;
+            for (const e of this.spawner.enemies) {
+                if (!e.active || e.x < beamX) continue;
+                if (Math.abs(e.y - beamY) > (e.radius || 0) + beamHalfWidth) continue;
+                const killed = e.takeDamage(dmgThisFrame);
+                if (killed) {
+                    this.score += 10;
+                    this.particles.createColorExplosion(e.x, e.y,
+                        ['#ff0066', '#ffffff', '#ff8800'], 20, 250, 0.6, 4);
+                }
+            }
+            this._laserBeam = { x1: beamX, y1: beamY, x2: this.canvas.width, y2: beamY };
+            // Continuous low rumble while firing (per #61 AC mention)
+            this.shake.shake(0.5, 0.02);
+        } else {
+            this._laserBeam = null;
+        }
+
         // Activate shield on E key (consume the keypress)
         if (this.keys['KeyE'] && this.state === STATE.PLAYING) {
             this.player.activateShield(this.audio);
@@ -418,8 +450,8 @@ class Game {
             this.keys['KeyY'] = false;
         }
 
-        // Enemies
-        this.spawner.update(dt, this.score, this.canvas.width, this.canvas.height,
+        // Enemies — visual movement slows under Time Warp
+        this.spawner.update(worldDt, this.score, this.canvas.width, this.canvas.height,
             this.projectiles, this.player.y, this.audio, this.player.x);
 
         // Phase announcement + boss spawning
@@ -479,9 +511,10 @@ class Game {
                 this.asteroidBelt.trigger(this.canvas.width, this.canvas.height);
             }
         }
-        this.solarFlare.update(dt);
-        this.blackHole.update(dt);
-        this.asteroidBelt.update(dt, this.canvas.width);
+        // Active hazards' visual updates slow under Time Warp; spawn timer above stays real-time.
+        this.solarFlare.update(worldDt);
+        this.blackHole.update(worldDt);
+        this.asteroidBelt.update(worldDt, this.canvas.width);
 
         // Black hole pull on player
         if (this.blackHole.active) {
@@ -524,20 +557,19 @@ class Game {
             this.music.setIntensity(Math.min(1, (this.lastPhase + 1) / 10));
         }
 
-        // Projectiles
-        this.projectiles.update(dt, this.canvas.width, this.canvas.height);
+        // Projectiles + particles slow under Time Warp.
+        this.projectiles.update(worldDt, this.canvas.width, this.canvas.height);
+        this.particles.update(worldDt);
 
-        // Particles
-        this.particles.update(dt);
-
-        // Power-ups
+        // Power-ups — spawn timer stays on real dt so warp doesn't starve drops;
+        // the dropped icon's drift slows visually with worldDt.
         this.powerupTimer -= dt;
         if (this.powerupTimer <= 0) {
             this.spawnPowerUp();
             this.powerupTimer = Utils.random(8, 15);
         }
         for (let i = this.powerups.length - 1; i >= 0; i--) {
-            this.powerups[i].update(dt, this.canvas.width);
+            this.powerups[i].update(worldDt, this.canvas.width);
             if (!this.powerups[i].active) {
                 this.powerups.splice(i, 1);
             }
@@ -780,6 +812,25 @@ class Game {
     }
 
     handlePlayerHit() {
+        // Nuke Overcharge intercept: the next damaging hit auto-detonates a bomb (or
+        // absorbs harmlessly if no bombs left). Consumed on use either way.
+        if (this.player.nukeOvercharge) {
+            this.player.nukeOvercharge = false;
+            this.player.nukeOverchargeTimer = 0;
+            if (this.player.bombs > 0) {
+                const kills = this.player.activateBomb(this.audio, this.particles, this.spawner.enemies);
+                if (kills > 0) this.score += kills * 5;
+                this.bombFlashTimer = 0.3;
+                this.shake.shake(15, 0.5);
+            } else {
+                // No bombs — absorb the hit with a small flash
+                this.particles.createColorExplosion(this.player.x, this.player.y,
+                    ['#ff4400', '#ffaa00', '#ffffff'], 24, 220, 0.5, 4);
+                this.shake.shake(6, 0.2);
+                this.audio.playPowerUp();
+            }
+            return;
+        }
         const dead = this.player.hit();
         if (dead) {
             this.particles.createColorExplosion(this.player.x, this.player.y,
@@ -817,6 +868,30 @@ class Game {
             this.spawner.draw(ctx);
             // Player
             this.player.draw(ctx);
+            // Laser Beam ray — drawn between player and projectiles for layering punch
+            if (this._laserBeam) {
+                const lb = this._laserBeam;
+                const flicker = 0.8 + 0.2 * Math.sin(this.time * 60);
+                ctx.save();
+                ctx.strokeStyle = '#ff0066';
+                ctx.shadowColor = '#ff0066';
+                ctx.shadowBlur = 18;
+                ctx.lineWidth = 6 * flicker;
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath();
+                ctx.moveTo(lb.x1, lb.y1);
+                ctx.lineTo(lb.x2, lb.y2);
+                ctx.stroke();
+                // Inner hot core
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.moveTo(lb.x1, lb.y1);
+                ctx.lineTo(lb.x2, lb.y2);
+                ctx.stroke();
+                ctx.restore();
+            }
             // Solar flare (in front of everything)
             this.solarFlare.draw(ctx, this.canvas.height);
             // Projectiles

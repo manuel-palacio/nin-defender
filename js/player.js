@@ -52,6 +52,17 @@ class Player {
         this.wingmanY = 0;
         this.wingmanShootTimer = 0;
 
+        // Time Warp — slows world dt, leaves player movement/fire untouched
+        this.timeWarp = false;
+        this.timeWarpTimer = 0;
+
+        // Laser Beam — replaces normal bullets with a sustained hitscan ray
+        this.laserBeam = false;
+        this.laserBeamTimer = 0;
+
+        // Nuke Overcharge — passive: next damaging hit auto-detonates 1 bomb
+        this.nukeOvercharge = false;
+        this.nukeOverchargeTimer = 0;
 
         // Active shield ability (E key)
         this.shieldCharges = 3;
@@ -125,6 +136,12 @@ class Player {
         this.ricochetTimer = 0;
         this.wingman = false;
         this.wingmanTimer = 0;
+        this.timeWarp = false;
+        this.timeWarpTimer = 0;
+        this.laserBeam = false;
+        this.laserBeamTimer = 0;
+        this.nukeOvercharge = false;
+        this.nukeOverchargeTimer = 0;
         this.fireRate = this.baseFireRate;
         this.shieldCharges = 3;
         this.activeShield = false;
@@ -146,6 +163,9 @@ class Player {
         if (this.shield) count++;
         if (this.ricochet) count++;
         if (this.wingman) count++;
+        if (this.timeWarp) count++;
+        if (this.laserBeam) count++;
+        if (this.nukeOvercharge) count++;
         return count;
     }
 
@@ -183,6 +203,18 @@ class Player {
                 this.wingmanTimer = POWERUP_TYPES.WINGMAN.duration;
                 this.wingmanX = this.x - 30;
                 this.wingmanY = this.y + 40;
+                break;
+            case 'TIME_WARP':
+                this.timeWarp = true;
+                this.timeWarpTimer = POWERUP_TYPES.TIME_WARP.duration;
+                break;
+            case 'LASER_BEAM':
+                this.laserBeam = true;
+                this.laserBeamTimer = POWERUP_TYPES.LASER_BEAM.duration;
+                break;
+            case 'NUKE_OVERCHARGE':
+                this.nukeOvercharge = true;
+                this.nukeOverchargeTimer = POWERUP_TYPES.NUKE_OVERCHARGE.duration;
                 break;
         }
     }
@@ -525,6 +557,20 @@ class Player {
             }
         }
 
+        // Time Warp / Laser Beam / Nuke Overcharge timers (use real dt — not slowed)
+        if (this.timeWarp) {
+            this.timeWarpTimer -= dt;
+            if (this.timeWarpTimer <= 0) this.timeWarp = false;
+        }
+        if (this.laserBeam) {
+            this.laserBeamTimer -= dt;
+            if (this.laserBeamTimer <= 0) this.laserBeam = false;
+        }
+        if (this.nukeOvercharge) {
+            this.nukeOverchargeTimer -= dt;
+            if (this.nukeOverchargeTimer <= 0) this.nukeOvercharge = false;
+        }
+
         // Active shield timer
         if (this.activeShield) {
             this.activeShieldTimer -= dt;
@@ -565,10 +611,11 @@ class Player {
         }
     }
 
-    // Returns {tripleShot, rapidFire} when a shot fires, or null when on cooldown / dead.
+    // Returns {tripleShot, rapidFire} when a shot fires, or null when on cooldown / dead /
+    // when the laser beam is the active weapon (laser handles its own per-frame damage).
     // Caller uses the result to apply mode-appropriate screen-shake + recoil.
     shoot(projectilePool, particles, audio) {
-        if (this.shootCooldown > 0 || !this.alive) return null;
+        if (this.shootCooldown > 0 || !this.alive || this.laserBeam) return null;
         this.shootCooldown = this.fireRate;
 
         const bulletSpeed = 700;
