@@ -386,14 +386,24 @@ class Game {
             }
         }
 
-        // Wingman auto-fire
+        // Wingman auto-fire — synergies tweak cadence + projectile properties
         if (this.player.wingman && this.player.wingmanShootTimer <= 0) {
-            this.player.wingmanShootTimer = 0.3;
+            const synergy = this.player.getActiveSynergy();
+            // FIRE_SUPPORT (rapid+wingman): wingman matches player fire rate
+            this.player.wingmanShootTimer = synergy === 'FIRE_SUPPORT'
+                ? this.player.fireRate
+                : 0.3;
             const p = this.projectiles.get();
             if (p) {
                 p.init(this.player.wingmanX + 15, this.player.wingmanY,
                     600, Utils.random(-30, 30), '#4488ff', '#4488ff', false,
                     this.player.baseDamage || 1);
+                // BOUNCE_DRONE (wingman+ricochet): wingman bullets also bounce
+                if (synergy === 'BOUNCE_DRONE') {
+                    p.bounces = 3;
+                    p.color = '#ff8800';
+                    p.glowColor = '#ff8800';
+                }
             }
         }
 
@@ -648,7 +658,7 @@ class Game {
                 const e = enemies[i];
                 if (!e.active) continue;
                 if (Utils.circleCollision(bullet.x, bullet.y, bullet.radius, e.x, e.y, e.radius)) {
-                    bullet.active = false;
+                    if (!bullet.pierce) bullet.active = false;
                     const killed = e.takeDamage(bullet.damage);
                     if (killed) {
                         e.active = false;

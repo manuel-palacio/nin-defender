@@ -176,6 +176,18 @@ class Player {
         return 1.0;
     }
 
+    // Synergy detection: returns the first matching combo key, or null. Each
+    // synergy key has a corresponding effect baked into shoot() / wingman fire /
+    // projectile setup; check this once for HUD display.
+    getActiveSynergy() {
+        if (this.ricochet && this.tripleShot) return 'CHAIN_REACTION';
+        if (this.rapidFire && this.wingman)   return 'FIRE_SUPPORT';
+        if (this.shield && this.tripleShot)   return 'PIERCE_SHOT';
+        if (this.rapidFire && this.tripleShot) return 'PENTA_SPREAD';
+        if (this.wingman && this.ricochet)    return 'BOUNCE_DRONE';
+        return null;
+    }
+
     applyPowerUp(type) {
         switch (type) {
             case 'RAPID_FIRE':
@@ -630,12 +642,21 @@ class Player {
         const bvy = bulletSpeed * Math.sin(tilt);
 
         const bounceCount = this.ricochet ? 3 : 0;
-        const bulletColor = this.ricochet ? '#ff8800' : '#00ffff';
+        const synergy = this.getActiveSynergy();
+        const bulletColor = synergy === 'CHAIN_REACTION' ? '#ff4400'
+                          : synergy === 'PIERCE_SHOT'    ? '#00aaff'
+                          : synergy === 'PENTA_SPREAD'   ? '#ff00ff'
+                          : this.ricochet                ? '#ff8800'
+                          : '#00ffff';
+
         const p = projectilePool.get();
         if (p) {
             const extraVy = this.ricochet ? Utils.random(-80, 80) : 0;
             p.init(tipX, tipY, bvx, bvy + extraVy, bulletColor, bulletColor, false, dmg);
             p.bounces = bounceCount;
+            p.splitOnBounce = synergy === 'CHAIN_REACTION';
+            // PIERCE_SHOT: center bullet passes through enemies
+            p.pierce = synergy === 'PIERCE_SHOT';
         }
 
         // Triple shot extras — spread relative to firing angle
@@ -645,19 +666,40 @@ class Player {
             if (p2) {
                 p2.init(tipX, tipY - 5,
                     bulletSpeed * Math.cos(tilt - spread), bulletSpeed * Math.sin(tilt - spread),
-                    '#00ff66', '#00ff66', false, dmg);
+                    bulletColor, bulletColor, false, dmg);
                 p2.bounces = bounceCount;
+                p2.splitOnBounce = synergy === 'CHAIN_REACTION';
             }
             const p3 = projectilePool.get();
             if (p3) {
                 p3.init(tipX, tipY + 5,
                     bulletSpeed * Math.cos(tilt + spread), bulletSpeed * Math.sin(tilt + spread),
-                    '#00ff66', '#00ff66', false, dmg);
+                    bulletColor, bulletColor, false, dmg);
                 p3.bounces = bounceCount;
+                p3.splitOnBounce = synergy === 'CHAIN_REACTION';
+            }
+
+            // PENTA_SPREAD: rapid+triple gets two more outer bullets
+            if (synergy === 'PENTA_SPREAD') {
+                const wide = 0.36;
+                const p4 = projectilePool.get();
+                if (p4) {
+                    p4.init(tipX, tipY - 9,
+                        bulletSpeed * Math.cos(tilt - wide), bulletSpeed * Math.sin(tilt - wide),
+                        bulletColor, bulletColor, false, dmg);
+                    p4.bounces = bounceCount;
+                }
+                const p5 = projectilePool.get();
+                if (p5) {
+                    p5.init(tipX, tipY + 9,
+                        bulletSpeed * Math.cos(tilt + wide), bulletSpeed * Math.sin(tilt + wide),
+                        bulletColor, bulletColor, false, dmg);
+                    p5.bounces = bounceCount;
+                }
             }
         }
 
-        particles.createMuzzleFlash(tipX + 5, tipY, 0, '#00ffff');
+        particles.createMuzzleFlash(tipX + 5, tipY, 0, bulletColor);
         return { tripleShot: this.tripleShot, rapidFire: this.rapidFire };
     }
 

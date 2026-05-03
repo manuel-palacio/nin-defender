@@ -145,6 +145,25 @@ class UIRenderer {
             ctx.shadowBlur = 0;
             puY += 18;
         }
+        // Synergy label — distinct combo names for the active power-up pairing
+        const synergy = g.player.getActiveSynergy();
+        if (synergy) {
+            const labels = {
+                CHAIN_REACTION: 'CHAIN REACTION',
+                FIRE_SUPPORT:   'FIRE SUPPORT',
+                PIERCE_SHOT:    'PIERCE SHOT',
+                PENTA_SPREAD:   'PENTA SPREAD',
+                BOUNCE_DRONE:   'BOUNCE DRONE',
+            };
+            const synergyPulse = 0.7 + 0.3 * Math.sin(g.time * 7);
+            ctx.font = 'bold 13px Courier New';
+            ctx.fillStyle = '#ff00ff';
+            ctx.shadowColor = '#ff00ff';
+            ctx.shadowBlur = 8 * synergyPulse;
+            ctx.fillText(`SYNERGY: ${labels[synergy]}`, 16, puY);
+            ctx.shadowBlur = 0;
+            puY += 18;
+        }
 
         // Phase announcement — center screen, fading (driven by GSAP via Anim)
         if (g.anim.phaseBanner.visible) {

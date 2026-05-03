@@ -18,6 +18,8 @@ class Projectile {
         this.active = false;
         this.isEnemy = false;
         this.damage = 1;
+        this.pierce = false;
+        this.splitOnBounce = false;
     }
 
     init(x, y, vx, vy, color, glowColor, isEnemy, damage = 1) {
@@ -32,6 +34,8 @@ class Projectile {
         this.damage = damage;
         this.radius = (isEnemy ? 3 : 4) * GAME_SCALE;
         this.bounces = 0; // remaining bounces (0 = no bounce)
+        this.pierce = false;
+        this.splitOnBounce = false;
     }
 
     update(dt, canvasW, canvasH) {
@@ -107,12 +111,43 @@ class ProjectilePool {
     }
 
     update(dt, canvasW, canvasH) {
+        // Tracks bullets that bounced this frame and should split — detected by
+        // the bounces counter dropping. Splitting happens after the main update
+        // pass so we don't iterate over the new bullets we just spawned.
+        const splitParents = [];
         for (let i = 0; i < this.pool.length; i++) {
-            if (this.pool[i].active) {
-                this.pool[i].update(dt, canvasW, canvasH);
+            const p = this.pool[i];
+            if (!p.active) continue;
+            const beforeBounces = p.bounces;
+            p.update(dt, canvasW, canvasH);
+            if (p.splitOnBounce && p.active && p.bounces < beforeBounces) {
+                splitParents.push(p);
             }
         }
+        // Spawn 2 splits per bounce, smaller and at diverging angles.
+        for (const parent of splitParents) {
+            this._spawnSplits(parent);
+        }
         this._rebuildCache();
+    }
+
+    _spawnSplits(parent) {
+        const angle = 0.4;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        const splits = [
+            { vx:  parent.vx * cos - parent.vy * sin, vy:  parent.vx * sin + parent.vy * cos },
+            { vx:  parent.vx * cos + parent.vy * sin, vy: -parent.vx * sin + parent.vy * cos },
+        ];
+        for (const s of splits) {
+            const child = this.get();
+            if (!child) break;
+            child.init(parent.x, parent.y, s.vx, s.vy,
+                parent.color, parent.glowColor, false, Math.max(1, parent.damage * 0.5));
+            child.radius = parent.radius * 0.7;
+            // Splits don't re-split (avoid runaway cascades) but inherit remaining bounces.
+            child.bounces = Math.max(0, parent.bounces);
+            child.splitOnBounce = false;
+        }
     }
 
     draw(ctx) {
