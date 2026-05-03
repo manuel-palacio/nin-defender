@@ -5,6 +5,7 @@ RUN sed -i "s/BUILD_VERSION/$(date +%s)/" /usr/share/nginx/html/index.html
 COPY css/ /usr/share/nginx/html/css/
 COPY js/ /usr/share/nginx/html/js/
 COPY assets/ /usr/share/nginx/html/assets/
+COPY vendor/ /usr/share/nginx/html/vendor/
 # Custom nginx config for SPA and caching
 RUN echo 'server { \
     listen 8080; \
