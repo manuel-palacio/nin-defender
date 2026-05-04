@@ -2,7 +2,8 @@
 // game.js — Game state machine, update loop, collision, HUD
 // ============================================================
 
-import { Utils, AudioManager, MusicManager, ScreenShake, GAME_SCALE } from './utils.js';
+import { Utils, AudioManager, MusicManager, ScreenShake } from './utils.js';
+import { GAME_SCALE } from './constants.js';
 import { Background, SolarFlare, BlackHole, AsteroidBelt } from './background.js';
 import { ParticlePool } from './particles.js';
 import { ProjectilePool } from './projectiles.js';

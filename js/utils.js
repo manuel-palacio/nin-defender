@@ -2,13 +2,7 @@
 // utils.js — Utility functions, audio manager, screen shake
 // ============================================================
 
-// Global scale factor — 1.0 at 1920px width, scales down on smaller screens.
-// `let` so updateGameScale() can reassign; ES module live-binding means
-// importers see the new value automatically.
-export let GAME_SCALE = 1.0;
-export function updateGameScale(canvasWidth) {
-    GAME_SCALE = Math.max(0.5, Math.min(1.0, canvasWidth / 1200));
-}
+// GAME_SCALE + updateGameScale moved to constants.js — import from there.
 
 export const Utils = {
     random(min, max) {

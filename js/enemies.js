@@ -2,7 +2,8 @@
 // enemies.js — Asteroids and enemy ships
 // ============================================================
 
-import { Utils, GAME_SCALE } from './utils.js';
+import { Utils } from './utils.js';
+import { GAME_SCALE } from './constants.js';
 
 // --- Base enemy ---
 export class Enemy {

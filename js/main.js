@@ -2,7 +2,8 @@
 // main.js — Entry point: asset loading, canvas setup, input, game loop
 // ============================================================
 
-import { AssetLoader, ASSET_MANIFEST, updateGameScale } from './utils.js';
+import { AssetLoader, ASSET_MANIFEST } from './utils.js';
+import { updateGameScale } from './constants.js';
 import { Game, STATE } from './game.js';
 
 (function () {

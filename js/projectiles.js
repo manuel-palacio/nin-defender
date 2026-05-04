@@ -2,7 +2,7 @@
 // projectiles.js — Laser projectiles with pooling
 // ============================================================
 
-import { GAME_SCALE } from './utils.js';
+import { GAME_SCALE } from './constants.js';
 
 export class Projectile {
     constructor() {

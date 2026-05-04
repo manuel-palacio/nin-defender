@@ -2,7 +2,8 @@
 // player.js — Player ship with movement, shooting, power-ups
 // ============================================================
 
-import { Utils, GAME_SCALE } from './utils.js';
+import { Utils } from './utils.js';
+import { GAME_SCALE } from './constants.js';
 import { POWERUP_TYPES } from './powerups.js';
 import { Schemas } from './schemas.js';
 import { emitter } from './events.js';
