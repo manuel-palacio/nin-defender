@@ -184,9 +184,13 @@ export class Player {
     }
 
     getPowerComboMultiplier() {
+        // Tightened cap — combo (×4 max) × power-combo (×3) was inflating
+        // score to 12x and making early phases sprint by in 30 seconds.
+        // Now caps at 1.5x so the multiplier still rewards stacking but
+        // doesn't dominate.
         const count = this.getActivePowerUpCount();
-        if (count >= 3) return 3.0;
-        if (count >= 2) return 2.0;
+        if (count >= 3) return 1.5;
+        if (count >= 2) return 1.25;
         return 1.0;
     }
 

@@ -22,6 +22,7 @@ export class Projectile {
         this.damage = 1;
         this.pierce = false;
         this.splitOnBounce = false;
+        this.hitEnemies = null; // pierce-bullet hit-list, init on demand
     }
 
     init(x, y, vx, vy, color, glowColor, isEnemy, damage = 1) {
@@ -38,6 +39,7 @@ export class Projectile {
         this.bounces = 0; // remaining bounces (0 = no bounce)
         this.pierce = false;
         this.splitOnBounce = false;
+        this.hitEnemies = null;
     }
 
     update(dt, canvasW, canvasH) {

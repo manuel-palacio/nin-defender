@@ -2485,18 +2485,19 @@ export class Boss extends Enemy {
 // ============================================================
 // Phase definitions — each phase has a featured enemy and a score threshold
 export const PHASES = [
-    // Phases 1-5: easy — generous gaps, one new enemy type per phase
-    { name: 'ASTEROID FIELD',     threshold: 0,    featured: 'asteroid',  color: '#aa7733' },
-    { name: 'CRITTER COLONY',     threshold: 600,  featured: 'ship',      color: '#ff6644' },
-    { name: 'FIREFLY SWARM',      threshold: 1000, featured: 'drone',     color: '#44ff66' },
-    { name: 'JELLYFISH DRIFT',    threshold: 1800, featured: 'mine',      color: '#ff88cc' },
-    { name: 'ARACHNID SECTOR',    threshold: 2800, featured: 'spider',    color: '#66ff22' },
-    // Phases 6-10: difficulty ramps up
-    { name: 'GHOST NEBULA',       threshold: 4000, featured: 'ghost',     color: '#bb66ff' },
-    { name: 'OCTOPUS DEN',        threshold: 5500, featured: 'bomber',    color: '#cc44ff' },
-    { name: 'CHAMELEON VOID',     threshold: 7500, featured: 'stealth',   color: '#00cccc' },
-    { name: 'DEVIL\'S DOMAIN',    threshold: 10000, featured: 'devil',    color: '#ff4400' },
-    { name: 'TOTAL CHAOS',        threshold: 13000, featured: 'all',      color: '#ff3366' }
+    // Re-pushed ~5x for early phases — combo + power-combo + pierce-bug fix
+    // changed the kill rate enough that the previous numbers blew through 5
+    // phases in ~30s. New curve targets ~2 minutes for phases 1-5.
+    { name: 'ASTEROID FIELD',     threshold: 0,     featured: 'asteroid',  color: '#aa7733' },
+    { name: 'CRITTER COLONY',     threshold: 3000,  featured: 'ship',      color: '#ff6644' },
+    { name: 'FIREFLY SWARM',      threshold: 6500,  featured: 'drone',     color: '#44ff66' },
+    { name: 'JELLYFISH DRIFT',    threshold: 11000, featured: 'mine',      color: '#ff88cc' },
+    { name: 'ARACHNID SECTOR',    threshold: 17000, featured: 'spider',    color: '#66ff22' },
+    { name: 'GHOST NEBULA',       threshold: 24000, featured: 'ghost',     color: '#bb66ff' },
+    { name: 'OCTOPUS DEN',        threshold: 32000, featured: 'bomber',    color: '#cc44ff' },
+    { name: 'CHAMELEON VOID',     threshold: 41000, featured: 'stealth',   color: '#00cccc' },
+    { name: 'DEVIL\'S DOMAIN',    threshold: 52000, featured: 'devil',     color: '#ff4400' },
+    { name: 'TOTAL CHAOS',        threshold: 65000, featured: 'all',       color: '#ff3366' }
 ];
 
 export class EnemySpawner {

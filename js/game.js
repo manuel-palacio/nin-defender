@@ -798,7 +798,16 @@ export class Game {
                 const e = enemies[i];
                 if (!e.active) continue;
                 if (Utils.circleCollision(bullet.x, bullet.y, bullet.radius, e.x, e.y, e.radius)) {
-                    if (!bullet.pierce) bullet.active = false;
+                    // Pierce bullets pass through but should hit each enemy ONCE,
+                    // not every frame they overlap (which was melting bosses in
+                    // a single bullet pass). Track the per-bullet hit-list.
+                    if (bullet.pierce) {
+                        if (!bullet.hitEnemies) bullet.hitEnemies = new Set();
+                        if (bullet.hitEnemies.has(e)) continue;
+                        bullet.hitEnemies.add(e);
+                    } else {
+                        bullet.active = false;
+                    }
                     // Boss damage feels weighty: 3-frame hit-stop + theme-color flash.
                     if (e.type === 'boss' && this._hitStopFrames === 0) {
                         this._hitStopFrames = 3;
