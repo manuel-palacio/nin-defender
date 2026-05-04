@@ -279,542 +279,843 @@ export class Boss extends Enemy {
     }
 
     _drawCritterBoss(ctx, r, t, color, pulse) {
-        // Giant armored bug — antennae, mandibles, segmented shell, legs
+        // Giant facehugger — exposed ribcage, ovipositor tube + dropping eggs.
+        const flesh = 'hsl(15, 70%, 18%)';
+        const fleshDim = 'hsl(15, 60%, 10%)';
+        const fleshHi = 'hsl(15, 50%, 30%)';
 
-        // Legs — 4 per side, scuttling
-        ctx.strokeStyle = '#884422';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = fleshDim;
+        ctx.lineWidth = 4;
         ctx.lineCap = 'round';
         for (let side = -1; side <= 1; side += 2) {
-            for (let i = 0; i < 4; i++) {
-                const phase = i * 1.0 + (side > 0 ? Math.PI * 0.4 : 0);
-                const wave = Math.sin(t * 6 + phase) * 0.2;
-                const baseAngle = side * 0.45 + (i - 1.5) * 0.35;
-                const jx = Math.cos(baseAngle + wave) * r * 0.7;
-                const jy = Math.sin(baseAngle + wave) * r * 0.65 * side;
-                const tx = Math.cos(baseAngle + wave + side * 0.3) * r * 1.2;
-                const ty = Math.sin(baseAngle + wave + side * 0.3) * r * 1.0 * side;
+            for (let i = 0; i < 5; i++) {
+                const phase = i * 0.7 + (side > 0 ? Math.PI * 0.4 : 0);
+                const wave = Math.sin(t * 8 + phase) * 0.4;
+                const baseX = (i - 2) * r * 0.30;
+                const baseY = side * r * 0.20;
+                const jX = baseX + Math.cos(wave) * r * 0.25;
+                const jY = baseY + side * r * 0.40;
+                const hX = jX + Math.cos(wave + side * 0.5) * r * 0.30;
+                const hY = jY + side * (r * 0.28 + Math.abs(Math.sin(wave * 2)) * r * 0.06);
                 ctx.beginPath();
-                ctx.moveTo(0, side * r * 0.12);
-                ctx.lineTo(jx, jy);
-                ctx.lineTo(tx, ty);
+                ctx.moveTo(baseX, baseY);
+                ctx.lineTo(jX, jY);
+                ctx.lineTo(hX, hY);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(hX, hY);
+                ctx.lineTo(hX - r * 0.07, hY + side * r * 0.05);
                 ctx.stroke();
             }
         }
-
-        // Antennae
-        ctx.strokeStyle = '#cc6633';
-        ctx.lineWidth = 2;
-        const antWave = Math.sin(t * 3) * 0.25;
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.45, -r * 0.15);
-        ctx.quadraticCurveTo(-r * 0.9, -r * 0.7 - antWave * r, -r, -r * 0.55);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.45, r * 0.15);
-        ctx.quadraticCurveTo(-r * 0.9, r * 0.7 + antWave * r, -r, r * 0.55);
-        ctx.stroke();
-        // Tips
-        ctx.fillStyle = '#ffaa00';
-        ctx.shadowColor = '#ffaa00';
-        ctx.shadowBlur = 5;
-        ctx.beginPath(); ctx.arc(-r, -r * 0.55, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(-r, r * 0.55, 3, 0, Math.PI * 2); ctx.fill();
-
-        // Abdomen — segmented shell
         ctx.shadowBlur = 0;
-        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.55);
-        abdGrad.addColorStop(0, '#cc6633');
-        abdGrad.addColorStop(0.6, '#884420');
-        abdGrad.addColorStop(1, '#442210');
-        ctx.fillStyle = abdGrad;
+        const bodyGrad = ctx.createLinearGradient(-r * 0.85, 0, r * 0.85, 0);
+        bodyGrad.addColorStop(0, fleshDim);
+        bodyGrad.addColorStop(0.5, flesh);
+        bodyGrad.addColorStop(1, fleshDim);
+        ctx.fillStyle = bodyGrad;
         ctx.beginPath();
-        ctx.ellipse(r * 0.15, 0, r * 0.55, r * 0.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, r * 0.95, r * 0.40, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Shell segments
-        ctx.strokeStyle = 'rgba(50, 20, 10, 0.6)';
+        // Exposed ribcage (clearly visible bone)
+        ctx.strokeStyle = 'rgba(220, 215, 200, 0.55)';
         ctx.lineWidth = 1.5;
-        for (let s = -2; s <= 2; s++) {
-            const sx = r * 0.15 + s * r * 0.12;
+        for (let i = 0; i < 7; i++) {
+            const rx = -r * 0.55 + i * r * 0.18;
             ctx.beginPath();
-            ctx.moveTo(sx, -r * 0.38);
-            ctx.lineTo(sx, r * 0.38);
+            ctx.moveTo(rx, -r * 0.18);
+            ctx.lineTo(rx, r * 0.18);
             ctx.stroke();
         }
-        // Shell pattern spots
-        ctx.fillStyle = `rgba(255, 180, 60, ${0.3 + 0.15 * pulse})`;
-        ctx.beginPath(); ctx.ellipse(r * 0.25, -r * 0.1, r * 0.08, r * 0.06, 0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(r * 0.05, r * 0.12, r * 0.07, r * 0.05, -0.3, 0, Math.PI * 2); ctx.fill();
-
-        // Head
-        const headGrad = ctx.createRadialGradient(-r * 0.35, 0, 0, -r * 0.35, 0, r * 0.38);
-        headGrad.addColorStop(0, '#dd7744');
-        headGrad.addColorStop(1, '#663318');
-        ctx.fillStyle = headGrad;
+        ctx.strokeStyle = 'rgba(200, 195, 180, 0.4)';
+        ctx.beginPath(); ctx.moveTo(-r * 0.55, 0); ctx.lineTo(r * 0.55, 0); ctx.stroke();
+        // Wound glow
+        const woundPulse = 0.5 + 0.5 * Math.sin(t * 3);
+        ctx.fillStyle = `hsla(200, 90%, 55%, ${0.35 + 0.45 * woundPulse})`;
+        ctx.shadowColor = 'hsla(200, 90%, 55%, 1)';
+        ctx.shadowBlur = 12 * woundPulse;
         ctx.beginPath();
-        ctx.ellipse(-r * 0.35, 0, r * 0.38, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.05, r * 0.25, r * 0.40, r * 0.07, 0, 0, Math.PI * 2);
         ctx.fill();
-
-        // Compound insect eyes — angular, wide coverage
-        const eyePulse = 0.7 + 0.3 * Math.sin(t * 5);
-        ctx.fillStyle = `rgba(255, 180, 0, ${eyePulse})`;
-        ctx.shadowColor = '#ffaa00';
-        ctx.shadowBlur = 6 * eyePulse;
-        ctx.beginPath(); ctx.ellipse(-r * 0.52, -r * 0.15, r * 0.14, r * 0.09, -0.4, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(-r * 0.52, r * 0.15, r * 0.14, r * 0.09, 0.4, 0, Math.PI * 2); ctx.fill();
-        // Facet grid lines
-        ctx.strokeStyle = 'rgba(80, 40, 0, 0.5)';
-        ctx.lineWidth = 0.5;
         ctx.shadowBlur = 0;
-        for (let f = -2; f <= 2; f++) {
+        // Proboscises
+        const probVib = Math.sin(t * 28) * r * 0.04;
+        ctx.strokeStyle = fleshHi;
+        ctx.lineWidth = 2;
+        for (const offY of [-r * 0.10, r * 0.10]) {
             ctx.beginPath();
-            ctx.moveTo(-r * 0.52 + f * r * 0.025, -r * 0.22);
-            ctx.lineTo(-r * 0.52 + f * r * 0.025, -r * 0.08);
+            ctx.moveTo(-r * 0.55, offY);
+            ctx.quadraticCurveTo(-r * 0.85, offY * 1.6, -r * 1.10 + probVib, offY * 0.4);
             ctx.stroke();
+            ctx.fillStyle = '#222';
             ctx.beginPath();
-            ctx.moveTo(-r * 0.52 + f * r * 0.025, r * 0.08);
-            ctx.lineTo(-r * 0.52 + f * r * 0.025, r * 0.22);
-            ctx.stroke();
+            ctx.arc(-r * 1.10 + probVib, offY * 0.4, 2, 0, Math.PI * 2);
+            ctx.fill();
         }
-
-        // Mandibles — pinching
-        ctx.strokeStyle = '#aa5522';
-        ctx.lineWidth = 3;
-        const mWave = Math.sin(t * 4) * 0.12;
+        // Maw + teeth
+        const mouthOpen = 0.5 + 0.5 * Math.sin(t * 8);
+        const mouthW = r * 0.18;
+        const mouthH = r * 0.06 + r * 0.12 * mouthOpen;
+        ctx.fillStyle = '#100';
         ctx.beginPath();
-        ctx.moveTo(-r * 0.6, -r * 0.08);
-        ctx.quadraticCurveTo(-r * 0.85, -r * 0.2 - mWave * r, -r * 0.8, -r * 0.3);
-        ctx.stroke();
+        ctx.ellipse(-r * 0.62, 0, mouthW, mouthH, 0, 0, Math.PI * 2);
+        ctx.fill();
+        if (mouthOpen > 0.2) {
+            ctx.fillStyle = '#ddd';
+            for (let i = 0; i < 6; i++) {
+                const tx = -r * 0.62 - mouthW + (i + 0.5) * (mouthW * 2 / 6);
+                ctx.beginPath();
+                ctx.moveTo(tx, -mouthH);
+                ctx.lineTo(tx + mouthW * 0.10, -mouthH + r * 0.05);
+                ctx.lineTo(tx - mouthW * 0.10, -mouthH + r * 0.05);
+                ctx.closePath(); ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(tx, mouthH);
+                ctx.lineTo(tx + mouthW * 0.10, mouthH - r * 0.05);
+                ctx.lineTo(tx - mouthW * 0.10, mouthH - r * 0.05);
+                ctx.closePath(); ctx.fill();
+            }
+        }
+        // Ovipositor tube + dropping eggs
+        const tubeWobble = Math.sin(t * 2.5) * r * 0.10;
+        ctx.strokeStyle = fleshHi;
+        ctx.lineWidth = r * 0.10;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(-r * 0.6, r * 0.08);
-        ctx.quadraticCurveTo(-r * 0.85, r * 0.2 + mWave * r, -r * 0.8, r * 0.3);
+        ctx.moveTo(-r * 0.55, r * 0.20);
+        ctx.quadraticCurveTo(-r * 0.40, r * 0.65 + tubeWobble, -r * 0.30, r * 1.05);
         ctx.stroke();
+        ctx.fillStyle = '#ddd6c0';
+        ctx.shadowColor = '#88aabb';
+        ctx.shadowBlur = 4;
+        for (let e = 0; e < 4; e++) {
+            const prog = ((t * 0.7 + e * 0.27) % 1.4);
+            const along = Math.min(prog, 1.0);
+            const ex = -r * 0.55 + (-r * 0.30 + r * 0.55) * along + tubeWobble * along * 0.6;
+            const ey = r * 0.20 + (r * 1.05 - r * 0.20) * along + (prog > 1 ? (prog - 1) * r * 1.0 : 0);
+            ctx.globalAlpha = prog > 1 ? Math.max(0, 1.4 - prog) : 1;
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, r * 0.05, r * 0.07, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        // Tiny eyes
+        ctx.fillStyle = '#ffaa00';
+        ctx.beginPath(); ctx.arc(-r * 0.42, -r * 0.20, r * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.42, r * 0.20, r * 0.04, 0, Math.PI * 2); ctx.fill();
     }
 
     _drawFireflyBoss(ctx, r, t, color, pulse) {
-        // Giant queen firefly — pulsing bioluminescence, wings, swarm aura
-        const glow = 0.5 + 0.5 * Math.sin(t * 4);
-
-        // Aura of light
-        ctx.fillStyle = `rgba(220, 255, 0, ${0.08 * glow})`;
-        ctx.shadowColor = '#ddff00';
-        ctx.shadowBlur = 30 * glow;
+        // Giant eyeball cluster — 7 eyeballs orbiting a central pulsing mass.
+        const corePulse = 0.7 + 0.3 * Math.sin(t * 3);
+        // Central mass — fleshy pulsating sphere with veins
+        const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.55);
+        coreGrad.addColorStop(0, '#cc5566');
+        coreGrad.addColorStop(0.6, '#882233');
+        coreGrad.addColorStop(1, '#330011');
+        ctx.fillStyle = coreGrad;
+        ctx.shadowColor = '#ff3344';
+        ctx.shadowBlur = 18 * corePulse;
         ctx.beginPath();
-        ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.55 * (0.95 + 0.05 * corePulse), 0, Math.PI * 2);
         ctx.fill();
-
-        // Wings — large, translucent, fluttering
-        const wingAngle = Math.sin(t * 12) * 0.4;
-        ctx.fillStyle = `rgba(200, 255, 50, ${0.15 + 0.1 * glow})`;
-        ctx.shadowBlur = 8;
-        ctx.save(); ctx.rotate(-wingAngle);
-        ctx.beginPath(); ctx.ellipse(0, -r * 0.3, r * 0.9, r * 0.35, -0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.save(); ctx.rotate(wingAngle);
-        ctx.beginPath(); ctx.ellipse(0, r * 0.3, r * 0.9, r * 0.35, 0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-
-        // Body
         ctx.shadowBlur = 0;
-        ctx.fillStyle = '#3a3a10';
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.45, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
-
-        // Glowing abdomen
-        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.3);
-        abdGrad.addColorStop(0, `rgba(255, 255, 50, ${0.8 * glow})`);
-        abdGrad.addColorStop(1, `rgba(150, 200, 0, ${0.3 * glow})`);
-        ctx.fillStyle = abdGrad;
-        ctx.shadowColor = '#ddff00';
-        ctx.shadowBlur = 15 * glow;
-        ctx.beginPath(); ctx.ellipse(r * 0.15, 0, r * 0.3, r * 0.2, 0, 0, Math.PI * 2); ctx.fill();
-
-        // Compound eye band — insect, no face
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = `rgba(180, 220, 0, ${0.3 * glow})`;
-        ctx.beginPath();
-        ctx.ellipse(-r * 0.28, 0, r * 0.05, r * 0.18, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // Pulsing veins on the core
+        ctx.strokeStyle = `rgba(180, 0, 0, ${0.5 + 0.3 * corePulse})`;
+        ctx.lineWidth = 1.2;
+        for (let v = 0; v < 8; v++) {
+            const a = (v / 8) * Math.PI * 2 + t * 0.2;
+            const sR = r * 0.20;
+            const eR = r * 0.50;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * sR, Math.sin(a) * sR);
+            ctx.quadraticCurveTo(
+                Math.cos(a + 0.3) * eR * 0.9, Math.sin(a + 0.3) * eR * 0.9,
+                Math.cos(a) * eR, Math.sin(a) * eR
+            );
+            ctx.stroke();
+        }
+        // 7 orbiting eyeballs around the core
+        const eyeOrbitR = r * 0.85;
+        for (let i = 0; i < 7; i++) {
+            const a = (i / 7) * Math.PI * 2 + t * 0.6;
+            const ex = Math.cos(a) * eyeOrbitR;
+            const ey = Math.sin(a) * eyeOrbitR;
+            const eR = r * 0.20;
+            // Iris hue shifts per-eye for unsettling iridescence
+            const eyeHue = (i * 51 + t * 30) % 360;
+            // Sclera (off-white)
+            ctx.fillStyle = '#e8e0d8';
+            ctx.shadowColor = `hsl(${eyeHue}, 80%, 50%)`;
+            ctx.shadowBlur = 6;
+            ctx.beginPath(); ctx.arc(ex, ey, eR, 0, Math.PI * 2); ctx.fill();
+            // Iris
+            const irisGrad = ctx.createRadialGradient(ex, ey, 0, ex, ey, eR * 0.7);
+            irisGrad.addColorStop(0, `hsl(${eyeHue}, 80%, 45%)`);
+            irisGrad.addColorStop(1, `hsl(${eyeHue}, 90%, 25%)`);
+            ctx.fillStyle = irisGrad;
+            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(ex, ey, eR * 0.65, 0, Math.PI * 2); ctx.fill();
+            // Pupil — dilates/contracts on its own
+            const pupilR = eR * (0.30 + 0.12 * Math.sin(t * 4 + i));
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(ex, ey, pupilR, 0, Math.PI * 2); ctx.fill();
+            // Catch-light
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            ctx.beginPath(); ctx.arc(ex - eR * 0.20, ey - eR * 0.20, eR * 0.10, 0, Math.PI * 2); ctx.fill();
+            // Optic nerve trailing back to core
+            ctx.strokeStyle = `rgba(120, 0, 30, 0.55)`;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(ex - Math.cos(a) * eR, ey - Math.sin(a) * eR);
+            const wob = Math.sin(t * 4 + i * 1.3) * r * 0.08;
+            ctx.quadraticCurveTo(
+                Math.cos(a) * (eyeOrbitR * 0.4) + wob,
+                Math.sin(a) * (eyeOrbitR * 0.4) + wob,
+                Math.cos(a) * (r * 0.55), Math.sin(a) * (r * 0.55)
+            );
+            ctx.stroke();
+        }
     }
 
     _drawJellyfishBoss(ctx, r, t, color, pulse) {
-        // Giant jellyfish — dome bell, long tentacles, ethereal glow
+        // Giant severed hand — fingers form a cage that closes when boss is at low HP.
+        const hpFrac = this.hp / this.maxHp;
+        // Cage progress: 0 = fingers splayed open, 1 = fingers fully clenched
+        const cage = hpFrac < 0.4 ? Math.min(1, (0.4 - hpFrac) / 0.4) : 0;
+        const fleshDark = 'hsl(130, 25%, 18%)';
+        const fleshMid = 'hsl(130, 22%, 28%)';
 
-        // Tentacles — long, flowing
+        // 8 thick fingers, each with knuckle joints. Cage curls them inward.
+        const fingerCount = 8;
         ctx.lineCap = 'round';
-        for (let i = 0; i < 10; i++) {
-            const angle = (i / 10) * Math.PI * 0.9 + Math.PI * 0.55;
-            const w1 = Math.sin(t * 2 + i * 0.8) * 0.3;
-            const w2 = Math.sin(t * 1.5 + i * 1.2) * 0.25;
-            const len1 = r * 1.3;
-            const len2 = r * (2.0 + 0.3 * Math.sin(t + i));
-            const mx = Math.cos(angle + w1) * len1;
-            const my = Math.sin(angle + w1) * len1;
-            const ex = Math.cos(angle + w1 + w2) * len2;
-            const ey = Math.sin(angle + w1 + w2) * len2;
-            ctx.strokeStyle = `hsla(320, 70%, 60%, ${0.4 + 0.2 * pulse})`;
-            ctx.lineWidth = 3 - i * 0.2;
+        for (let i = 0; i < fingerCount; i++) {
+            const splay = ((i / (fingerCount - 1)) - 0.5) * Math.PI * 1.0;
+            const baseAngle = Math.PI + splay;
+            const phase = i * 1.4 + t * 1.5;
+            const twitch = Math.sin(phase) * 0.15;
+            // When cage closes, all fingers curl strongly inward
+            const curl = cage * 0.9 + Math.sin(t * 6) * cage * 0.05;
+            const ang = baseAngle + twitch + curl;
+
+            const seg1 = r * 0.65;
+            const k1x = Math.cos(ang) * seg1;
+            const k1y = Math.sin(ang) * seg1;
+            const seg2 = r * 0.50;
+            const k2x = k1x + Math.cos(ang + 0.2 + curl * 0.6) * seg2;
+            const k2y = k1y + Math.sin(ang + 0.2 + curl * 0.6) * seg2;
+            const seg3 = r * 0.35;
+            const tipX = k2x + Math.cos(ang + curl * 0.9) * seg3;
+            const tipY = k2y + Math.sin(ang + curl * 0.9) * seg3;
+
+            ctx.strokeStyle = fleshDark;
+            ctx.lineWidth = 7;
             ctx.beginPath();
-            ctx.moveTo(Math.cos(angle) * r * 0.4, Math.sin(angle) * r * 0.4);
-            ctx.quadraticCurveTo(mx, my, ex, ey);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(k1x, k1y);
+            ctx.lineTo(k2x, k2y);
+            ctx.lineTo(tipX, tipY);
+            ctx.stroke();
+            // Knuckle nodes
+            ctx.fillStyle = fleshMid;
+            ctx.beginPath(); ctx.arc(k1x, k1y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(k2x, k2y, 3.2, 0, Math.PI * 2); ctx.fill();
+            // Bone-spike tip
+            ctx.fillStyle = '#bfbfa8';
+            const tipAngle = Math.atan2(tipY - k2y, tipX - k2x);
+            const spikeLen = r * 0.13;
+            ctx.beginPath();
+            ctx.moveTo(tipX + Math.cos(tipAngle) * spikeLen, tipY + Math.sin(tipAngle) * spikeLen);
+            ctx.lineTo(tipX + Math.cos(tipAngle + 1.6) * 2.5, tipY + Math.sin(tipAngle + 1.6) * 2.5);
+            ctx.lineTo(tipX + Math.cos(tipAngle - 1.6) * 2.5, tipY + Math.sin(tipAngle - 1.6) * 2.5);
+            ctx.closePath();
+            ctx.fill();
+        }
+        // Palm
+        const palmGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
+        palmGrad.addColorStop(0, fleshMid);
+        palmGrad.addColorStop(0.7, fleshDark);
+        palmGrad.addColorStop(1, '#0e1812');
+        ctx.fillStyle = palmGrad;
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.65, r * 0.55, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        // Sigil eye in palm — brighter when cage is closing
+        const sigilColor = `rgba(180, 255, 120, ${0.4 + 0.4 * pulse + cage * 0.3})`;
+        ctx.fillStyle = sigilColor;
+        ctx.shadowColor = '#88ff44';
+        ctx.shadowBlur = 10 * pulse + cage * 12;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.20, r * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0a1a04';
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(180, 255, 120, ${0.5 + 0.3 * pulse})`;
+        ctx.lineWidth = 1.5;
+        for (let s = 0; s < 4; s++) {
+            const a = (s / 4) * Math.PI * 2 + t * 0.4;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.15);
+            ctx.lineTo(Math.cos(a) * r * 0.40, Math.sin(a) * r * 0.25);
             ctx.stroke();
         }
-
-        // Bell dome
-        const bellGrad = ctx.createRadialGradient(0, -r * 0.1, 0, 0, 0, r * 0.6);
-        bellGrad.addColorStop(0, `hsla(320, 80%, 75%, ${0.6 + 0.2 * pulse})`);
-        bellGrad.addColorStop(0.5, `hsla(320, 60%, 45%, 0.4)`);
-        bellGrad.addColorStop(1, `hsla(320, 50%, 25%, 0.15)`);
-        ctx.fillStyle = bellGrad;
-        ctx.shadowColor = '#ff66cc';
-        ctx.shadowBlur = 12 * pulse;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.55, Math.PI, 0);
-        ctx.quadraticCurveTo(r * 0.55, r * 0.25, r * 0.3, r * 0.3);
-        ctx.lineTo(-r * 0.3, r * 0.3);
-        ctx.quadraticCurveTo(-r * 0.55, r * 0.25, -r * 0.55, 0);
-        ctx.fill();
-
-        // Inner glow
-        ctx.fillStyle = `hsla(330, 100%, 70%, ${0.3 * pulse})`;
-        ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 0.15, 0, Math.PI * 2); ctx.fill();
     }
 
     _drawGhostBoss(ctx, r, t, color, pulse) {
-        // Giant wraith — translucent, wispy, hollow eyes
+        // Giant skull — at <50% HP the jaw unhinges completely revealing void.
+        const hpFrac = this.hp / this.maxHp;
+        const phaseTwo = hpFrac < 0.5;
+        const baseJawDrop = (Math.sin(t * 2) + 1) * 0.5; // 0..1
+        const unhinge = phaseTwo ? Math.min(1, (0.5 - hpFrac) / 0.5) : 0;
+        const jawDrop = baseJawDrop * (1 - unhinge) + unhinge;
 
-        // Wispy trails
-        const alphaBase = 0.3 + 0.3 * Math.sin(t * 1.5);
-        ctx.globalAlpha = alphaBase * 0.4;
-        ctx.fillStyle = '#8844cc';
-        for (let i = 0; i < 5; i++) {
-            const tx = r * 0.3 + i * r * 0.2;
-            const ty = Math.sin(t * 2 + i) * r * 0.25;
-            const tLen = r * (0.5 + 0.3 * Math.sin(t * 1.5 + i));
+        // Cranium — bumpy 14-point polygon
+        ctx.fillStyle = 'rgba(220, 220, 215, 0.95)';
+        ctx.shadowColor = '#88ccff';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        const N = 14;
+        for (let i = 0; i < N; i++) {
+            const a = -Math.PI + (i / (N - 1)) * Math.PI;
+            const wob = 0.94 + 0.06 * Math.sin(a * 5 + t);
+            const px = Math.cos(a) * r * 0.85 * wob;
+            const py = Math.sin(a) * r * 0.65 * wob - r * 0.15;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        // Cheekbones
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.65, r * 0.05); ctx.lineTo(-r * 0.45, r * 0.30); ctx.lineTo(-r * 0.30, r * 0.05); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.65, r * 0.05); ctx.lineTo(r * 0.45, r * 0.30); ctx.lineTo(r * 0.30, r * 0.05); ctx.closePath(); ctx.fill();
+        ctx.shadowBlur = 0;
+        // Hollow eye sockets with intense blue-fire glow
+        const eyeIntensity = 0.85 + 0.15 * Math.sin(t * 6);
+        ctx.fillStyle = '#020812';
+        ctx.beginPath(); ctx.ellipse(-r * 0.30, -r * 0.20, r * 0.18, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.30, -r * 0.20, r * 0.18, r * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+        for (const ex of [-r * 0.30, r * 0.30]) {
+            const g = ctx.createRadialGradient(ex, -r * 0.20, 0, ex, -r * 0.20, r * 0.18);
+            g.addColorStop(0, `rgba(0, 180, 255, ${eyeIntensity})`);
+            g.addColorStop(1, 'rgba(0, 180, 255, 0)');
+            ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.moveTo(tx, ty - r * 0.1);
-            ctx.quadraticCurveTo(tx + tLen * 0.5, ty + r * 0.15, tx + tLen, ty + r * 0.3);
-            ctx.quadraticCurveTo(tx + tLen * 0.5, ty - r * 0.1, tx, ty + r * 0.1);
+            ctx.ellipse(ex, -r * 0.20, r * 0.14, r * 0.16, 0, 0, Math.PI * 2);
             ctx.fill();
         }
-
-        // Main body — ghostly blob
-        ctx.globalAlpha = alphaBase;
-        const bodyGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.7);
-        bodyGrad.addColorStop(0, 'rgba(200, 150, 255, 0.7)');
-        bodyGrad.addColorStop(0.5, 'rgba(120, 70, 200, 0.4)');
-        bodyGrad.addColorStop(1, 'rgba(60, 30, 120, 0.1)');
-        ctx.fillStyle = bodyGrad;
+        // Lower jaw with phase-2 unhinge — drops far below the skull
+        const jawY = r * 0.22 + jawDrop * r * 0.50;
+        ctx.fillStyle = 'rgba(220, 220, 215, 0.95)';
         ctx.beginPath();
-        ctx.arc(0, -r * 0.1, r * 0.65, Math.PI, 0);
-        ctx.quadraticCurveTo(r * 0.65, r * 0.4, r * 0.25, r * 0.5);
-        ctx.quadraticCurveTo(0, r * 0.7, -r * 0.25, r * 0.5);
-        ctx.quadraticCurveTo(-r * 0.65, r * 0.4, -r * 0.65, 0);
+        ctx.ellipse(0, jawY, r * 0.42, r * 0.20, 0, 0, Math.PI * 2);
         ctx.fill();
-
-        // Void eyes — absorb light, no whites
-        ctx.globalAlpha = alphaBase + 0.4;
-        ctx.fillStyle = '#000000';
-        ctx.shadowColor = '#6600cc';
-        ctx.shadowBlur = 12;
-        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.12, r * 0.14, r * 0.19, -0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(r * 0.12, -r * 0.12, r * 0.14, r * 0.19, 0.15, 0, Math.PI * 2); ctx.fill();
-        // Purple glow around void edges
-        ctx.strokeStyle = `rgba(160, 60, 255, ${alphaBase + 0.4})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.12, r * 0.14, r * 0.19, -0.15, 0, Math.PI * 2); ctx.stroke();
-        ctx.beginPath(); ctx.ellipse(r * 0.12, -r * 0.12, r * 0.14, r * 0.19, 0.15, 0, Math.PI * 2); ctx.stroke();
-        ctx.globalAlpha = 1;
-    }
-
-    _drawChameleonBoss(ctx, r, t, color, pulse) {
-        // Giant chameleon — color-shifting, curled tail, rotating eyes
-        const hue = (t * 40) % 360;
-        const bodyColor = `hsl(${hue}, 50%, 30%)`;
-        const spotColor = `hsl(${(hue + 120) % 360}, 70%, 45%)`;
-
-        // Curled tail
-        ctx.strokeStyle = bodyColor;
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-        const tailCurl = Math.sin(t * 2) * 0.2;
-        ctx.beginPath();
-        ctx.moveTo(r * 0.4, 0);
-        ctx.quadraticCurveTo(r * 0.9, r * 0.2, r * 1.2, -r * 0.1 + tailCurl * r);
-        ctx.quadraticCurveTo(r * 1.4, -r * 0.5, r * 1.1, -r * 0.6 + tailCurl * r);
-        ctx.quadraticCurveTo(r * 0.8, -r * 0.5, r * 0.9, -r * 0.3);
-        ctx.stroke();
-
-        // Legs — stubby
-        ctx.lineWidth = 4;
-        const legWave = Math.sin(t * 5) * 0.15;
-        ctx.beginPath(); ctx.moveTo(-r * 0.2, -r * 0.3); ctx.lineTo(-r * 0.4, -r * 0.65 - legWave * r); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-r * 0.2, r * 0.3); ctx.lineTo(-r * 0.4, r * 0.65 + legWave * r); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(r * 0.15, -r * 0.3); ctx.lineTo(r * 0.3, -r * 0.6 + legWave * r); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(r * 0.15, r * 0.3); ctx.lineTo(r * 0.3, r * 0.6 - legWave * r); ctx.stroke();
-
-        // Body
-        const bGrad = ctx.createRadialGradient(-r * 0.1, 0, 0, 0, 0, r * 0.55);
-        bGrad.addColorStop(0, `hsl(${hue}, 40%, 40%)`);
-        bGrad.addColorStop(1, `hsl(${hue}, 50%, 18%)`);
-        ctx.fillStyle = bGrad;
-        ctx.shadowColor = `hsl(${hue}, 60%, 40%)`;
-        ctx.shadowBlur = 6;
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.55, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
-
-        // Head
-        ctx.fillStyle = `hsl(${hue}, 45%, 35%)`;
-        ctx.beginPath(); ctx.ellipse(-r * 0.45, 0, r * 0.3, r * 0.25, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(-r * 0.7, 0, r * 0.15, r * 0.13, 0, 0, Math.PI * 2); ctx.fill();
-
-        // Color spots
-        ctx.fillStyle = spotColor;
-        ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(r * 0.1, -r * 0.1, r * 0.08, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(-r * 0.1, r * 0.13, r * 0.06, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(r * 0.25, r * 0.05, r * 0.05, 0, Math.PI * 2); ctx.fill();
-
-        // Eyes — large, independent rotation
-        const eye1Angle = Math.sin(t * 1.5) * 0.6;
-        const eye2Angle = Math.sin(t * 2.1 + 1) * 0.6;
-        ctx.fillStyle = `hsl(55, 100%, 55%)`;
-        ctx.shadowColor = '#ffff00';
-        ctx.shadowBlur = 6;
-        ctx.beginPath(); ctx.arc(-r * 0.5, -r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(-r * 0.5, r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill();
-        // Slit pupils
+        // Mouth — voids open wide in phase 2
+        const mouthW = r * 0.25;
+        const mouthH = r * 0.13 + jawDrop * r * 0.18;
         ctx.fillStyle = '#000';
-        ctx.shadowBlur = 0;
-        ctx.save(); ctx.translate(-r * 0.5, -r * 0.15); ctx.rotate(eye1Angle);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.02, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.save(); ctx.translate(-r * 0.5, r * 0.15); ctx.rotate(eye2Angle);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.02, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-    }
-
-    _drawSpiderBoss(ctx, r, t, color, pulse) {
-        // Giant spider boss — 6 legs per side, bulbous body, many eyes
-        const legCount = 6;
-
-        // Legs — long, animated
-        ctx.strokeStyle = '#44aa11';
-        ctx.shadowColor = '#66ff22';
-        ctx.shadowBlur = 4;
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        for (let side = -1; side <= 1; side += 2) {
-            for (let i = 0; i < legCount; i++) {
-                const phase = i * 0.7 + (side > 0 ? Math.PI * 0.3 : 0);
-                const wave = Math.sin(t * 5 + phase) * 0.25;
-                const baseAngle = side * 0.5 + (i - legCount / 2 + 0.5) * 0.3;
-                const jx = Math.cos(baseAngle + wave) * r * 0.8;
-                const jy = Math.sin(baseAngle + wave) * r * 0.7 * side;
-                const tx = Math.cos(baseAngle + wave + side * 0.35) * r * 1.5;
-                const ty = Math.sin(baseAngle + wave + side * 0.35) * r * 1.2 * side;
+        ctx.beginPath();
+        ctx.ellipse(0, jawY, mouthW, mouthH, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // In phase 2: render the void inside the mouth as a dark blue swirl
+        if (phaseTwo) {
+            const voidGrad = ctx.createRadialGradient(0, jawY, 0, 0, jawY, mouthW);
+            voidGrad.addColorStop(0, `rgba(0, 80, 160, ${0.6 * unhinge})`);
+            voidGrad.addColorStop(0.6, `rgba(0, 30, 80, ${0.4 * unhinge})`);
+            voidGrad.addColorStop(1, '#000');
+            ctx.fillStyle = voidGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, jawY, mouthW, mouthH, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Swirl lines
+            ctx.strokeStyle = `rgba(0, 200, 255, ${0.5 * unhinge})`;
+            ctx.lineWidth = 1;
+            for (let s = 0; s < 3; s++) {
                 ctx.beginPath();
-                ctx.moveTo(0, side * r * 0.1);
-                ctx.lineTo(jx, jy);
-                ctx.lineTo(tx, ty);
+                ctx.arc(0, jawY, mouthW * (0.4 + s * 0.2), t * 2 + s, t * 2 + s + 1.5);
                 ctx.stroke();
             }
         }
+        // Teeth — 7 top + 7 bottom
+        ctx.fillStyle = '#cccfc4';
+        for (let i = 0; i < 7; i++) {
+            const tx = -mouthW + (i + 0.5) * (mouthW * 2 / 7);
+            ctx.beginPath();
+            ctx.moveTo(tx, jawY - mouthH);
+            ctx.lineTo(tx + r * 0.025, jawY - mouthH + r * 0.05);
+            ctx.lineTo(tx - r * 0.025, jawY - mouthH + r * 0.05);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(tx, jawY + mouthH);
+            ctx.lineTo(tx + r * 0.025, jawY + mouthH - r * 0.05);
+            ctx.lineTo(tx - r * 0.025, jawY + mouthH - r * 0.05);
+            ctx.closePath(); ctx.fill();
+        }
+        // Nasal cavity
+        ctx.fillStyle = '#0a0410';
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.05);
+        ctx.lineTo(-r * 0.07, r * 0.10);
+        ctx.lineTo(r * 0.07, r * 0.10);
+        ctx.closePath(); ctx.fill();
+    }
 
-        // Abdomen (rear, large)
+    _drawChameleonBoss(ctx, r, t, color, pulse) {
+        // Skeletal chameleon — at low HP skin fully disappears, only skeleton visible.
+        const hpFrac = this.hp / this.maxHp;
+        const fleshAlpha = Math.max(0, (hpFrac - 0.25) / 0.75); // fully fades by 25% HP
+        const skeletonAlpha = 0.4 + (1 - fleshAlpha) * 0.6;
+        // Tail
+        ctx.lineCap = 'round';
+        if (fleshAlpha > 0.05) {
+            ctx.strokeStyle = `hsla(170, 55%, 28%, ${fleshAlpha})`;
+            ctx.lineWidth = 4;
+            const tailCurl = Math.sin(t * 3) * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(r * 0.5, 0);
+            ctx.quadraticCurveTo(r * 1.05, r * 0.15, r * 1.30, -r * 0.05 + tailCurl * r);
+            ctx.quadraticCurveTo(r * 1.45, -r * 0.40 + tailCurl * r, r * 1.30, -r * 0.62 + tailCurl * r);
+            ctx.stroke();
+            // Tail spine glow
+            ctx.fillStyle = `hsla(220, 100%, 70%, ${fleshAlpha})`;
+            ctx.shadowColor = '#88aaff';
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(r * 1.30, -r * 0.62 + tailCurl * r, r * 0.07, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+        // Body skin (fades out as HP drops)
+        if (fleshAlpha > 0.05) {
+            const bodyGrad = ctx.createRadialGradient(-r * 0.1, 0, 0, 0, 0, r * 0.7);
+            bodyGrad.addColorStop(0, `hsla(170, 45%, 35%, ${fleshAlpha})`);
+            bodyGrad.addColorStop(1, `hsla(170, 55%, 14%, ${fleshAlpha})`);
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, r * 0.75, r * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Head
+            ctx.fillStyle = `hsla(170, 50%, 32%, ${fleshAlpha})`;
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.65, 0, r * 0.38, r * 0.20, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.95, 0, r * 0.18, r * 0.12, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Skeleton — always visible, alpha grows as flesh fades
+        ctx.strokeStyle = `rgba(220, 220, 200, ${skeletonAlpha})`;
+        ctx.lineWidth = 1.8;
+        // Spine
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.95, 0);
+        ctx.lineTo(r * 0.5, 0);
+        ctx.stroke();
+        // Ribs (8 pairs)
+        for (let i = 0; i < 8; i++) {
+            const rx = -r * 0.50 + i * r * 0.13;
+            ctx.beginPath();
+            ctx.moveTo(rx, 0);
+            ctx.quadraticCurveTo(rx + r * 0.04, r * 0.10, rx + r * 0.02, r * 0.18);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(rx, 0);
+            ctx.quadraticCurveTo(rx + r * 0.04, -r * 0.10, rx + r * 0.02, -r * 0.18);
+            ctx.stroke();
+        }
+        // Skull on the head end
+        ctx.fillStyle = `rgba(230, 230, 215, ${skeletonAlpha})`;
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.70, 0, r * 0.20, r * 0.14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Snout
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.95, 0, r * 0.12, r * 0.08, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Eye sockets — hollow black with bright yellow inside
+        ctx.fillStyle = `rgba(15, 5, 5, ${skeletonAlpha})`;
+        ctx.beginPath(); ctx.arc(-r * 0.72, -r * 0.05, r * 0.045, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.72, r * 0.05, r * 0.045, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(255, 240, 80, ${skeletonAlpha})`;
+        ctx.shadowColor = '#ffee00';
+        ctx.shadowBlur = 5;
+        ctx.beginPath(); ctx.arc(-r * 0.72, -r * 0.05, r * 0.025, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-r * 0.72, r * 0.05, r * 0.025, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
-        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.6);
-        abdGrad.addColorStop(0, '#3a5510');
-        abdGrad.addColorStop(0.6, '#1a2a08');
-        abdGrad.addColorStop(1, '#0a1000');
+        // Leg bones (4 thin lines as femurs)
+        for (const side of [-1, 1]) {
+            const legWave = Math.sin(t * 8) * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.30, side * r * 0.12);
+            ctx.lineTo(-r * 0.45, side * (r * 0.40 + legWave * r));
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(r * 0.20, side * r * 0.12);
+            ctx.lineTo(r * 0.35, side * (r * 0.40 - legWave * r));
+            ctx.stroke();
+        }
+    }
+
+    _drawSpiderBoss(ctx, r, t, color, pulse) {
+        // Giant face-spider — the screaming face fills the entire abdomen.
+        // Dark legs, pale fleshy abdomen, the face is huge and detailed.
+        ctx.strokeStyle = '#1a2010';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        // 5 legs per side, more menacing than the base
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < 5; i++) {
+                const freq = 8 * (1 + (i - 2) * 0.04);
+                const phase = i * 0.7 + (side > 0 ? Math.PI : 0);
+                const legWave = Math.sin(t * freq + phase) * 0.3;
+                const baseAngle = (side * 0.6) + (i - 2) * 0.32;
+                const j1x = Math.cos(baseAngle + legWave) * r * 0.75;
+                const j1y = Math.sin(baseAngle + legWave) * r * 0.65 * side;
+                const tipAngle = baseAngle + legWave * 1.5 + side * 0.4;
+                const tipX = Math.cos(tipAngle) * r * 1.55;
+                const tipY = Math.sin(tipAngle) * r * 1.20 * side;
+                ctx.beginPath();
+                ctx.moveTo(0, side * r * 0.18);
+                ctx.lineTo(j1x, j1y);
+                ctx.lineTo(tipX, tipY);
+                ctx.stroke();
+            }
+        }
+        // Pale skin-toned abdomen — large
+        const abdGrad = ctx.createRadialGradient(r * 0.15, 0, 0, r * 0.15, 0, r * 0.7);
+        abdGrad.addColorStop(0, 'hsl(40, 18%, 80%)');
+        abdGrad.addColorStop(0.6, 'hsl(38, 16%, 60%)');
+        abdGrad.addColorStop(1, 'hsl(35, 14%, 36%)');
         ctx.fillStyle = abdGrad;
         ctx.beginPath();
-        ctx.ellipse(r * 0.2, 0, r * 0.6, r * 0.45, 0, 0, Math.PI * 2);
+        ctx.ellipse(r * 0.15, 0, r * 0.75, r * 0.55, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Toxic markings
-        ctx.fillStyle = `rgba(100, 200, 30, ${0.3 + 0.2 * pulse})`;
-        ctx.beginPath(); ctx.ellipse(r * 0.3, -r * 0.1, r * 0.15, r * 0.1, 0.2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(r * 0.1, r * 0.15, r * 0.1, r * 0.08, -0.3, 0, Math.PI * 2); ctx.fill();
-
-        // Head/thorax (front)
-        const headGrad = ctx.createRadialGradient(-r * 0.35, 0, 0, -r * 0.35, 0, r * 0.4);
-        headGrad.addColorStop(0, '#2a3a0a');
-        headGrad.addColorStop(1, '#0a1200');
-        ctx.fillStyle = headGrad;
+        // ----- Huge stretched human face filling the abdomen -----
+        const faceWobble = Math.sin(t * 0.8);
+        const eyeSpacing = r * 0.30 * (1 + faceWobble * 0.06);
+        const faceX = r * 0.15;
+        // Eye sockets
+        ctx.fillStyle = '#0a0506';
         ctx.beginPath();
-        ctx.ellipse(-r * 0.35, 0, r * 0.4, r * 0.32, 0, 0, Math.PI * 2);
+        ctx.ellipse(faceX - eyeSpacing, -r * 0.18, r * 0.13, r * 0.18, 0, 0, Math.PI * 2);
         ctx.fill();
-
-        // Multiple eyes — 8 glowing red
-        const eyeGlow = 0.6 + 0.4 * Math.sin(t * 4);
-        ctx.fillStyle = `rgba(255, 0, 0, ${eyeGlow})`;
-        ctx.shadowColor = '#ff0000';
-        ctx.shadowBlur = 8 * eyeGlow;
-        const eyes = [
-            [-r * 0.55, -r * 0.12, r * 0.06], [-r * 0.55, r * 0.12, r * 0.06],
-            [-r * 0.5, -r * 0.22, r * 0.04], [-r * 0.5, r * 0.22, r * 0.04],
-            [-r * 0.6, -r * 0.05, r * 0.04], [-r * 0.6, r * 0.05, r * 0.04],
-            [-r * 0.45, -r * 0.18, r * 0.03], [-r * 0.45, r * 0.18, r * 0.03],
-        ];
-        for (const [ex, ey, er] of eyes) {
-            ctx.beginPath(); ctx.arc(ex, ey, er, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(faceX + eyeSpacing, -r * 0.18, r * 0.13, r * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Eye highlights (tiny white dot in each socket)
+        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+        ctx.beginPath(); ctx.arc(faceX - eyeSpacing - r * 0.04, -r * 0.22, r * 0.025, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(faceX + eyeSpacing - r * 0.04, -r * 0.22, r * 0.025, 0, Math.PI * 2); ctx.fill();
+        // Screaming mouth — large, distorted by sin
+        const mouthOpen = 1 + faceWobble * 0.20;
+        const mouthW = r * 0.32;
+        const mouthH = r * 0.22 * mouthOpen;
+        ctx.fillStyle = '#0a0506';
+        ctx.beginPath();
+        ctx.ellipse(faceX, r * 0.18, mouthW, mouthH, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Teeth (10 top + 10 bottom)
+        ctx.fillStyle = '#ddd6c8';
+        for (let i = 0; i < 10; i++) {
+            const tx = faceX - mouthW + (i + 0.5) * (mouthW * 2 / 10);
+            ctx.beginPath();
+            ctx.moveTo(tx, r * 0.18 - mouthH);
+            ctx.lineTo(tx + r * 0.020, r * 0.18 - mouthH + r * 0.04);
+            ctx.lineTo(tx - r * 0.020, r * 0.18 - mouthH + r * 0.04);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(tx, r * 0.18 + mouthH);
+            ctx.lineTo(tx + r * 0.020, r * 0.18 + mouthH - r * 0.04);
+            ctx.lineTo(tx - r * 0.020, r * 0.18 + mouthH - r * 0.04);
+            ctx.closePath(); ctx.fill();
         }
-
-        // Mandibles
-        ctx.strokeStyle = '#88aa22';
+        // Stretch lines from mouth corners
+        ctx.strokeStyle = 'rgba(80, 60, 60, 0.4)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(faceX - mouthW, r * 0.18);
+        ctx.lineTo(faceX - mouthW * 1.6, r * 0.18 + r * 0.06);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(faceX + mouthW, r * 0.18);
+        ctx.lineTo(faceX + mouthW * 1.6, r * 0.18 + r * 0.06);
+        ctx.stroke();
+        // Tear-track lines from eye sockets (the face is crying)
+        ctx.strokeStyle = 'rgba(60, 30, 30, 0.5)';
+        ctx.lineWidth = 0.6;
+        for (const ex of [faceX - eyeSpacing, faceX + eyeSpacing]) {
+            ctx.beginPath();
+            ctx.moveTo(ex, -r * 0.05);
+            ctx.lineTo(ex - r * 0.03, r * 0.05);
+            ctx.stroke();
+        }
+        // Thorax — slightly darker pale
+        const thorGrad = ctx.createRadialGradient(-r * 0.45, 0, 0, -r * 0.45, 0, r * 0.40);
+        thorGrad.addColorStop(0, 'hsl(35, 14%, 50%)');
+        thorGrad.addColorStop(1, 'hsl(32, 12%, 28%)');
+        ctx.fillStyle = thorGrad;
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.45, 0, r * 0.40, r * 0.32, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // 8 red eyes on the thorax (head end)
+        const eyeGlow = 0.7 + 0.3 * Math.sin(t * 5);
+        ctx.fillStyle = `rgba(255, 20, 20, ${eyeGlow})`;
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 7 * eyeGlow;
+        const cluster = [
+            [-r * 0.60, -r * 0.08], [-r * 0.60,  r * 0.08],
+            [-r * 0.55, -r * 0.16], [-r * 0.55,  r * 0.16],
+            [-r * 0.68, -r * 0.13], [-r * 0.68,  r * 0.13],
+            [-r * 0.50, -r * 0.04], [-r * 0.50,  r * 0.04],
+        ];
+        for (const [ex, ey] of cluster) {
+            ctx.beginPath();
+            ctx.arc(ex, ey, r * 0.045, 0, Math.PI * 2);
+            ctx.fill();
+        }
         ctx.shadowBlur = 0;
-        ctx.lineWidth = 3;
-        const mWave = Math.sin(t * 3) * 0.15;
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.6, -r * 0.08);
-        ctx.quadraticCurveTo(-r * 0.85, -r * 0.25 - mWave * r, -r * 0.75, -r * 0.35);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.6, r * 0.08);
-        ctx.quadraticCurveTo(-r * 0.85, r * 0.25 + mWave * r, -r * 0.75, r * 0.35);
-        ctx.stroke();
     }
 
     _drawOctopusBoss(ctx, r, t, color, pulse) {
-        // Giant octopus boss — tentacles and bulbous head
-        const tentCount = 8;
-        ctx.lineCap = 'round';
-
+        // Gore octopus — beak ALWAYS visible and gnashing, ink stains all over,
+        // both eyes dead/cloudy at low HP.
+        const hpFrac = this.hp / this.maxHp;
+        const lowHP = hpFrac < 0.4;
         // Tentacles
-        for (let i = 0; i < tentCount; i++) {
-            const angle = (i / tentCount) * Math.PI * 1.6 + Math.PI * 0.2;
-            const w1 = Math.sin(t * 2 + i * 1.0) * 0.35;
-            const w2 = Math.sin(t * 1.8 + i * 0.6) * 0.25;
-            const sx = Math.cos(angle) * r * 0.5;
-            const sy = Math.sin(angle) * r * 0.5;
-            const mx = Math.cos(angle + w1) * r * 1.2;
-            const my = Math.sin(angle + w1) * r * 1.1;
-            const ex = Math.cos(angle + w1 + w2) * r * 1.8;
-            const ey = Math.sin(angle + w1 + w2) * r * 1.5;
-            ctx.strokeStyle = `hsla(275, 50%, ${30 + i * 3}%, 0.7)`;
-            ctx.lineWidth = 5 - i * 0.3;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 1.5 + Math.PI * 0.25;
+            const wave1 = Math.sin(t * 3 + i * 1.2) * 0.3;
+            const wave2 = Math.sin(t * 2.5 + i * 0.8) * 0.2;
+            const startX = Math.cos(angle) * r * 0.55;
+            const startY = Math.sin(angle) * r * 0.55;
+            const midX = Math.cos(angle + wave1) * r * 1.20;
+            const midY = Math.sin(angle + wave1) * r * 1.20;
+            const endX = Math.cos(angle + wave1 + wave2) * r * 1.70;
+            const endY = Math.sin(angle + wave1 + wave2) * r * 1.55;
+            ctx.strokeStyle = `hsla(275, 50%, ${28 + i * 2}%, 0.9)`;
+            ctx.lineWidth = 5 - i * 0.2;
             ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.quadraticCurveTo(mx, my, ex, ey);
+            ctx.moveTo(startX, startY);
+            ctx.quadraticCurveTo(midX, midY, endX, endY);
+            ctx.stroke();
+            // Hooked sucker tip
+            ctx.strokeStyle = '#220033';
+            ctx.lineWidth = 2;
+            const hookAngle = Math.atan2(endY - midY, endX - midX);
+            ctx.beginPath();
+            ctx.arc(endX, endY, r * 0.07, hookAngle - 0.5, hookAngle + Math.PI * 0.6);
             ctx.stroke();
         }
-
-        // Head dome
-        const hGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.65);
-        hGrad.addColorStop(0, '#cc66ff');
-        hGrad.addColorStop(0.5, '#7722bb');
-        hGrad.addColorStop(1, '#330066');
-        ctx.fillStyle = hGrad;
+        // Mantle — torn-edge polygon
+        const mantleGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.15, 0, 0, 0, r * 0.7);
+        mantleGrad.addColorStop(0, '#9944cc');
+        mantleGrad.addColorStop(0.5, '#5e1a88');
+        mantleGrad.addColorStop(1, '#2a0a44');
+        ctx.fillStyle = mantleGrad;
         ctx.shadowColor = '#aa44ff';
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.ellipse(0, -r * 0.1, r * 0.6, r * 0.55, 0, 0, Math.PI * 2);
+        const N = 16;
+        for (let i = 0; i < N; i++) {
+            const a = (i / N) * Math.PI * 2 - Math.PI * 0.5;
+            const tear = 0.85 + 0.15 * Math.sin(a * 5 + t * 0.7) - Math.abs(Math.sin(a * 4 + i)) * 0.10;
+            const rx = Math.cos(a) * r * 0.75 * tear;
+            const ry = Math.sin(a) * r * 0.65 * tear - r * 0.10;
+            if (i === 0) ctx.moveTo(rx, ry);
+            else ctx.lineTo(rx, ry);
+        }
+        ctx.closePath();
         ctx.fill();
-
-        // Bioluminescent spots
-        ctx.fillStyle = `rgba(200, 150, 255, ${0.4 * pulse})`;
         ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.2, r * 0.08, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(r * 0.15, -r * 0.15, r * 0.06, 0, Math.PI * 2); ctx.fill();
-
-        // Alien cephalopod eyes — dark iris, no whites
-        ctx.fillStyle = 'hsla(275, 80%, 15%, 0.95)';
-        ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.05, r * 0.14, r * 0.1, -0.1, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(r * 0.15, -r * 0.05, r * 0.14, r * 0.1, 0.1, 0, Math.PI * 2); ctx.fill();
-        // W-shaped pupils (real octopus anatomy)
-        ctx.strokeStyle = `rgba(200, 150, 255, ${0.4 * pulse})`;
+        // Many ink stains across the body
+        ctx.fillStyle = 'rgba(15, 0, 25, 0.6)';
+        const stains = [
+            [-r * 0.32, -r * 0.12, r * 0.16, r * 0.10],
+            [ r * 0.12, -r * 0.32, r * 0.13, r * 0.09],
+            [ r * 0.30,  r * 0.10, r * 0.10, r * 0.08],
+            [-r * 0.05,  r * 0.18, r * 0.13, r * 0.07],
+            [-r * 0.45,  r * 0.05, r * 0.08, r * 0.06],
+            [ r * 0.40, -r * 0.05, r * 0.07, r * 0.05],
+        ];
+        for (const [sx, sy, sw, sh] of stains) {
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, sw, sh, Math.sin(t + sx) * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Eyes — both dead/cloudy at low HP, otherwise one is dead one alive
+        ctx.fillStyle = '#222';
+        ctx.beginPath(); ctx.ellipse(-r * 0.25, -r * 0.06, r * 0.20, r * 0.15, -0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(r * 0.20, -r * 0.06, r * 0.20, r * 0.15, 0.1, 0, Math.PI * 2); ctx.fill();
+        // Always-cloudy left eye
+        ctx.fillStyle = 'rgba(200, 200, 220, 0.92)';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.25, -r * 0.06, r * 0.16, r * 0.12, -0.1, 0, Math.PI * 2);
+        ctx.fill();
+        if (lowHP) {
+            // Both eyes cloudy at low HP
+            ctx.beginPath();
+            ctx.ellipse(r * 0.20, -r * 0.06, r * 0.16, r * 0.12, 0.1, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Right eye alive
+            ctx.fillStyle = '#eeddff';
+            ctx.beginPath();
+            ctx.ellipse(r * 0.20, -r * 0.06, r * 0.16, r * 0.12, 0.1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#110022';
+            ctx.beginPath();
+            ctx.ellipse(r * 0.20, -r * 0.04, r * 0.06, r * 0.10, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Beak — ALWAYS visible and gnashing (faster on low HP)
+        const clackSpeed = lowHP ? 12 : 7;
+        const clack = Math.sin(t * clackSpeed) * 0.20;
+        ctx.fillStyle = '#0a0010';
+        ctx.strokeStyle = '#332244';
         ctx.lineWidth = 1.5;
+        const beakBaseY = r * 0.22;
+        ctx.save(); ctx.translate(0, beakBaseY); ctx.rotate(clack);
         ctx.beginPath();
-        ctx.moveTo(-r * 0.27, -r * 0.05); ctx.lineTo(-r * 0.22, r * 0.02);
-        ctx.lineTo(-r * 0.18, -r * 0.05); ctx.lineTo(-r * 0.14, r * 0.02);
-        ctx.lineTo(-r * 0.09, -r * 0.05);
-        ctx.stroke();
+        ctx.moveTo(-r * 0.14, 0); ctx.lineTo(0, r * 0.18); ctx.lineTo(r * 0.05, 0);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
+        ctx.save(); ctx.translate(0, beakBaseY); ctx.rotate(-clack);
         ctx.beginPath();
-        ctx.moveTo(r * 0.08, -r * 0.05); ctx.lineTo(r * 0.12, r * 0.02);
-        ctx.lineTo(r * 0.16, -r * 0.05); ctx.lineTo(r * 0.2, r * 0.02);
-        ctx.lineTo(r * 0.24, -r * 0.05);
-        ctx.stroke();
+        ctx.moveTo(r * 0.14, 0); ctx.lineTo(0, r * 0.18); ctx.lineTo(-r * 0.05, 0);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.restore();
     }
 
     _drawDevilBoss(ctx, r, t, color, pulse) {
-        // Devil/demon boss — horns, fire, menacing
+        // Body horror devil — at low HP cracks cover entire body glowing brightly.
+        const hpFrac = this.hp / this.maxHp;
+        const cracksIntensity = Math.max(0, 1 - hpFrac); // 0 at full HP, 1 at zero
         const fireFlicker = 0.7 + 0.3 * Math.sin(t * 12);
-
-        // Fire aura
-        ctx.fillStyle = `rgba(255, 40, 0, ${0.15 * fireFlicker})`;
+        // Embers from head
+        ctx.fillStyle = `rgba(255, 180, 80, ${0.6 * fireFlicker})`;
+        ctx.shadowColor = '#ffaa44';
+        ctx.shadowBlur = 5;
+        for (let i = 0; i < 6; i++) {
+            const phase = i * 1.7 + t * 1.4;
+            const ex = Math.sin(phase) * r * 0.40;
+            const ey = -r * 1.10 - ((phase * 0.6) % 1) * r * 0.7;
+            ctx.beginPath();
+            ctx.arc(ex, ey, r * (0.025 + 0.02 * Math.sin(phase * 2)), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        // Aura
+        ctx.fillStyle = `rgba(255, 60, 0, ${0.18 * fireFlicker})`;
         ctx.shadowColor = '#ff4400';
-        ctx.shadowBlur = 20 * fireFlicker;
+        ctx.shadowBlur = 18 * fireFlicker;
         ctx.beginPath();
-        ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 1.55, 0, Math.PI * 2);
         ctx.fill();
-
-        // Horns — large
-        ctx.strokeStyle = '#aa1100';
-        ctx.fillStyle = '#661100';
-        ctx.shadowBlur = 6;
-        ctx.lineWidth = 3;
+        ctx.shadowBlur = 0;
+        // Spine ridge
+        ctx.fillStyle = '#660800';
+        ctx.strokeStyle = '#330400';
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 7; i++) {
+            const sx = -r * 0.50 + i * r * 0.17;
+            const sh = r * (0.22 - Math.abs(i - 3) * 0.04);
+            ctx.beginPath();
+            ctx.moveTo(sx - r * 0.07, -r * 0.62);
+            ctx.lineTo(sx, -r * 0.62 - sh);
+            ctx.lineTo(sx + r * 0.07, -r * 0.62);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        }
+        // Horns
+        ctx.fillStyle = '#aa1100';
+        ctx.strokeStyle = '#cc2200';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(-r * 0.2, -r * 0.5);
-        ctx.quadraticCurveTo(-r * 0.5, -r * 1.4, -r * 0.05, -r * 1.2);
-        ctx.lineTo(-r * 0.1, -r * 0.5);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        ctx.moveTo(-r * 0.30, -r * 0.55);
+        ctx.quadraticCurveTo(-r * 0.65, -r * 1.40, -r * 0.18, -r * 1.20);
+        ctx.lineTo(-r * 0.22, -r * 0.55);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(r * 0.2, -r * 0.5);
-        ctx.quadraticCurveTo(r * 0.5, -r * 1.4, r * 0.05, -r * 1.2);
-        ctx.lineTo(r * 0.1, -r * 0.5);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-
-        // Head — dark red sphere
-        const headGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.7);
+        ctx.moveTo(r * 0.30, -r * 0.55);
+        ctx.quadraticCurveTo(r * 0.65, -r * 1.40, r * 0.18, -r * 1.20);
+        ctx.lineTo(r * 0.22, -r * 0.55);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // Bone groove lines on horns
+        ctx.strokeStyle = 'rgba(60, 0, 0, 0.7)';
+        ctx.lineWidth = 0.7;
+        for (const sign of [-1, 1]) {
+            for (let g = 0; g < 3; g++) {
+                ctx.beginPath();
+                ctx.moveTo(sign * r * 0.27, -r * (0.70 + g * 0.18));
+                ctx.lineTo(sign * r * 0.20, -r * (0.90 + g * 0.10));
+                ctx.stroke();
+            }
+        }
+        // Head body
+        const headGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.85);
         headGrad.addColorStop(0, '#881100');
-        headGrad.addColorStop(0.6, '#440808');
+        headGrad.addColorStop(0.7, '#550808');
         headGrad.addColorStop(1, '#220000');
         ctx.fillStyle = headGrad;
         ctx.shadowColor = '#ff2200';
-        ctx.shadowBlur = 10 * fireFlicker;
+        ctx.shadowBlur = 8 * fireFlicker;
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 0.80, 0, Math.PI * 2);
         ctx.fill();
-
-        // Menacing eyes — large, asymmetric, tilted
+        // Many cracks — count grows with damage
+        const crackCount = 4 + Math.floor(cracksIntensity * 12);
+        ctx.strokeStyle = `rgba(255, 100, 0, ${(0.5 + 0.4 * cracksIntensity) * fireFlicker})`;
+        ctx.shadowColor = '#ff8800';
+        ctx.shadowBlur = (4 + 8 * cracksIntensity) * fireFlicker;
+        ctx.lineWidth = 1.5;
+        for (let c = 0; c < crackCount; c++) {
+            // Pseudo-random but stable per-crack positions
+            const seed = c * 1.371;
+            const a1 = seed % (Math.PI * 2);
+            const a2 = a1 + 0.5 + (seed * 0.7) % 1.5;
+            const a3 = a2 + 0.4 + (seed * 0.4) % 1.0;
+            const baseR = 0.15 + ((seed * 0.3) % 0.6);
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a1) * r * baseR, Math.sin(a1) * r * baseR);
+            ctx.lineTo(Math.cos(a2) * r * (baseR + 0.18), Math.sin(a2) * r * (baseR + 0.18));
+            ctx.lineTo(Math.cos(a3) * r * (baseR + 0.30), Math.sin(a3) * r * (baseR + 0.30));
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        // Eyes
         const eyeGlow = 0.7 + 0.3 * Math.sin(t * 6);
         ctx.fillStyle = `rgba(255, 200, 0, ${eyeGlow})`;
         ctx.shadowColor = '#ffaa00';
-        ctx.shadowBlur = 15 * eyeGlow;
-        ctx.save();
-        ctx.translate(-r * 0.25, -r * 0.18);
-        ctx.rotate(-0.35);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.22, r * 0.10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 12 * eyeGlow;
+        ctx.save(); ctx.translate(-r * 0.28, -r * 0.18); ctx.rotate(-0.2);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.18, r * 0.10, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        ctx.save();
-        ctx.translate(r * 0.18, -r * 0.12);
-        ctx.rotate(0.2);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.18, r * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.translate(r * 0.22, -r * 0.18); ctx.rotate(0.2);
+        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.18, r * 0.10, 0, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        // Vertical slit pupils
-        ctx.fillStyle = '#200000';
-        ctx.shadowBlur = 0;
-        ctx.save(); ctx.translate(-r * 0.25, -r * 0.18); ctx.rotate(-0.35);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.03, r * 0.08, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-        ctx.save(); ctx.translate(r * 0.18, -r * 0.12); ctx.rotate(0.2);
-        ctx.beginPath(); ctx.ellipse(0, 0, r * 0.025, r * 0.07, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
-
-        // Jagged mouth
-        ctx.strokeStyle = `rgba(255, 100, 0, ${0.7 + 0.3 * fireFlicker})`;
+        // Jagged grin
+        ctx.strokeStyle = `rgba(255, 100, 0, ${0.6 + 0.4 * fireFlicker})`;
         ctx.lineWidth = 2;
         ctx.shadowBlur = 4;
         ctx.beginPath();
-        ctx.moveTo(-r * 0.3, r * 0.15);
-        for (let i = 0; i < 6; i++) {
-            const mx = -r * 0.3 + (i + 0.5) * (r * 0.6 / 6);
-            const my = r * 0.15 + (i % 2 === 0 ? r * 0.12 : 0);
+        ctx.moveTo(-r * 0.40, r * 0.22);
+        for (let i = 0; i < 7; i++) {
+            const mx = -r * 0.40 + (i + 0.5) * (r * 0.80 / 7);
+            const my = r * 0.22 + (i % 2 === 0 ? r * 0.16 : 0);
             ctx.lineTo(mx, my);
         }
-        ctx.lineTo(r * 0.3, r * 0.15);
+        ctx.lineTo(r * 0.40, r * 0.22);
         ctx.stroke();
     }
 
