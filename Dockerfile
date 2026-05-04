@@ -7,8 +7,7 @@ RUN npm ci || npm install
 COPY index.html vite.config.js ./
 COPY js/ ./js/
 COPY css/ ./css/
-COPY assets/ ./assets/
-COPY manifest.json ./
+COPY public/ ./public/
 RUN npm run build
 
 FROM nginx:alpine
