@@ -120,6 +120,7 @@ import { Game, STATE } from './game.js';
             }
         });
 
+        const JOYSTICK_DEAD_ZONE = 0.10;
         function handleJoystick(touch) {
             const rect = joystickBase.getBoundingClientRect();
             const cx = rect.left + rect.width / 2;
@@ -134,8 +135,15 @@ import { Game, STATE } from './game.js';
             }
             joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
             game.joystick.active = true;
-            game.joystick.dx = dx / maxDist;
-            game.joystick.dy = dy / maxDist;
+            const norm = dist / maxDist;
+            if (norm < JOYSTICK_DEAD_ZONE || dist === 0) {
+                game.joystick.dx = 0;
+                game.joystick.dy = 0;
+            } else {
+                const adjusted = (norm - JOYSTICK_DEAD_ZONE) / (1 - JOYSTICK_DEAD_ZONE);
+                game.joystick.dx = (dx / dist) * adjusted;
+                game.joystick.dy = (dy / dist) * adjusted;
+            }
         }
 
         fireButton.addEventListener('touchstart', e => {
@@ -143,11 +151,13 @@ import { Game, STATE } from './game.js';
             game.touchFiring = true;
         });
         fireButton.addEventListener('touchmove', e => {
-            // Stop firing if finger moves outside the button
+            // Tolerate small thumb micro-movements — only cancel when the
+            // touch leaves a margin around the button.
             const touch = e.changedTouches[0];
             const rect = fireButton.getBoundingClientRect();
-            if (touch.clientX < rect.left || touch.clientX > rect.right ||
-                touch.clientY < rect.top || touch.clientY > rect.bottom) {
+            const MARGIN = 8;
+            if (touch.clientX < rect.left - MARGIN || touch.clientX > rect.right + MARGIN ||
+                touch.clientY < rect.top - MARGIN  || touch.clientY > rect.bottom + MARGIN) {
                 game.touchFiring = false;
             }
         });
@@ -216,6 +226,18 @@ import { Game, STATE } from './game.js';
             const muted = game.audio.toggleMute();
             muteBtn.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
         });
+
+        // Pause button — mirrors the P/Esc keyboard shortcut so touch users
+        // can pause mid-run.
+        const pauseBtn = document.getElementById('pauseBtn');
+        if (pauseBtn) {
+            const triggerPause = e => {
+                e.preventDefault();
+                game.onKeyDown('KeyP');
+            };
+            pauseBtn.addEventListener('touchstart', triggerPause);
+            pauseBtn.addEventListener('click', triggerPause);
+        }
 
         // ---- Game loop ----
         let lastTime = 0;

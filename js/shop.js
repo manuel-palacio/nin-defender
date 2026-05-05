@@ -141,6 +141,7 @@ export class Shop {
     draw(ctx, canvas, player) {
         const w = canvas.width;
         const h = canvas.height;
+        this._isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         ctx.save();
 
@@ -204,6 +205,20 @@ export class Shop {
                 ctx.fillStyle = '#cc0000';
                 ctx.font = 'bold 16px Courier New';
                 ctx.fillText('>', startX - 25, iy - itemH * 0.15);
+
+                // Touch users need an explicit tap affordance — desktop's
+                // "select with W/S, confirm with SPACE" pattern isn't obvious.
+                // Render right-aligned in the bottom of the highlighted row to
+                // stay clear of the description on the left and the cost above.
+                if (this._isTouch) {
+                    const purchasable = item.canPurchase(player);
+                    const label = purchasable ? '» TAP TO BUY' : '» SELECTED';
+                    ctx.font = 'bold 10px Courier New';
+                    ctx.fillStyle = purchasable ? '#ff2200' : '#555';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(label, startX + itemW, iy + itemH * 0.18);
+                    ctx.textAlign = 'left';
+                }
             }
 
             // Greying logic — different per kind
@@ -277,7 +292,7 @@ export class Shop {
         ctx.font = 'bold 14px Courier New';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#fff';
-        ctx.fillText('CONTINUE', w / 2, btnY + 24);
+        ctx.fillText(this._isTouch ? 'TAP HERE TO CONTINUE →' : 'CONTINUE', w / 2, btnY + 24);
         // Store button bounds for touch
         this._continueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
         this._itemStartY = startY;
@@ -288,9 +303,8 @@ export class Shop {
         ctx.textAlign = 'center';
         ctx.font = '11px Courier New';
         ctx.fillStyle = '#444';
-        const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        ctx.fillText(isMobile
-            ? 'TAP to select • TAP again to buy • CONTINUE to proceed'
+        ctx.fillText(this._isTouch
+            ? 'TAP an item to select • TAP again to buy'
             : 'W/S to select • SPACE to buy • ENTER to continue', w / 2, h * 0.96);
 
         ctx.restore();

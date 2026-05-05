@@ -90,8 +90,8 @@ html, body {
     position: absolute;
     right: 15px;
     bottom: 15px;
-    width: 110px;
-    height: 110px;
+    width: 130px;
+    height: 130px;
     border-radius: 50%;
     background: rgba(139, 0, 0, 0.2);
     border: 3px solid rgba(204, 0, 0, 0.5);
@@ -136,6 +136,30 @@ html, body {
     border-color: var(--nin-red);
 }
 
+#pauseBtn {
+    position: fixed;
+    top: 80px;
+    left: 10px;
+    z-index: 20;
+    background: rgba(20, 20, 20, 0.6);
+    border: 1px solid rgba(204, 0, 0, 0.3);
+    border-radius: 2px;
+    color: var(--nin-light);
+    font-size: 22px;
+    line-height: 1;
+    padding: 4px 10px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s, border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    user-select: none;
+}
+#pauseBtn:hover, #pauseBtn:active {
+    opacity: 1;
+    border-color: var(--nin-red);
+}
+
 /* Portrait warning overlay */
 #portraitWarning {
     display: none;
@@ -168,16 +192,18 @@ html, body {
     50% { transform: rotate(90deg); }
 }
 
-/* Touch action buttons (shield + bomb) */
+/* Touch action buttons (shield + bomb) — positioned next to joystick so the
+   left thumb can reach them without crowding the right-hand FIRE button. */
 #touchActions {
     display: none;
     position: fixed;
-    bottom: 140px;
-    right: 15px;
+    bottom: 10px;
+    left: 180px;
+    right: auto;
     z-index: 10;
-    gap: 10px;
+    gap: 12px;
     pointer-events: none;
-    flex-direction: column;
+    flex-direction: row;
 }
 .touch-action-btn {
     width: 56px;
@@ -227,8 +253,14 @@ body.touch-device #gameCanvas {
 }
 body.touch-device #muteBtn {
     top: auto;
-    bottom: 180px;
+    bottom: 200px;
     right: 20px;
+}
+body.touch-device #pauseBtn {
+    top: 90px;
+    left: 10px;
+    font-size: 26px;
+    padding: 6px 14px;
 }
 
 /* Portrait warning — shown by JS when touch + portrait */
@@ -238,6 +270,7 @@ body.touch-portrait #portraitWarning {
 body.touch-portrait #gameCanvas,
 body.touch-portrait #touchControls,
 body.touch-portrait #touchActions,
-body.touch-portrait #muteBtn {
+body.touch-portrait #muteBtn,
+body.touch-portrait #pauseBtn {
     display: none !important;
 }
