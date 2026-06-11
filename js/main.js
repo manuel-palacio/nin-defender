@@ -39,13 +39,24 @@ import { Game, STATE } from './game.js';
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    // Logical (CSS-pixel) dimensions. The real canvas backing store is scaled
+    // by devicePixelRatio for sharp rendering on retina/mobile; all game code
+    // works in CSS pixels via this facade and the ctx transform below.
+    // DPR is capped at 2 — DPR-3 phones pay 9x the fill rate for sharpness
+    // nobody can see at arm's length.
+    const view = { width: 0, height: 0 };
     let game = null;
 
     function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        updateGameScale(canvas.width);
-        if (game) game.resize(canvas.width, canvas.height);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        view.width = window.innerWidth;
+        view.height = window.innerHeight;
+        canvas.width = Math.round(view.width * dpr);
+        canvas.height = Math.round(view.height * dpr);
+        // Assigning canvas.width resets all context state — re-apply the scale.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        updateGameScale(view.width);
+        if (game) game.resize(view.width, view.height);
     }
     resize();
     window.addEventListener('resize', resize);
@@ -57,7 +68,7 @@ import { Game, STATE } from './game.js';
     let loadingDone = false;
     function drawLoading() {
         if (loadingDone) return;
-        AssetLoader.drawLoadingScreen(ctx, canvas, loader.getProgress());
+        AssetLoader.drawLoadingScreen(ctx, view, loader.getProgress());
         requestAnimationFrame(drawLoading);
     }
     drawLoading();
@@ -75,7 +86,10 @@ import { Game, STATE } from './game.js';
         }
 
         // ---- Create game with loaded assets ----
-        game = new Game(canvas, ctx, assets);
+        game = new Game(view, ctx, assets);
+        // Debug/automation handle — Playwright & Puppeteer verification drives
+        // runs through this (see CLAUDE memory: browser verification is mandatory).
+        window.game = game;
 
         // ---- Keyboard input ----
         window.addEventListener('keydown', e => {
@@ -178,8 +192,8 @@ import { Game, STATE } from './game.js';
                 e.preventDefault();
                 const touch = e.changedTouches[0];
                 const rect = canvas.getBoundingClientRect();
-                const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
-                const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+                const x = (touch.clientX - rect.left) * (view.width / rect.width);
+                const y = (touch.clientY - rect.top) * (view.height / rect.height);
                 const result = game.shop.handleTouch(x, y, game.player);
                 if (result === 'continue') {
                     game.state = STATE.PLAYING;

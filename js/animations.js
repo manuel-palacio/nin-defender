@@ -43,6 +43,7 @@ export class Anim {
             pbScale: 0.5,
             pbAlpha: 0,
             pbDelta: 0,
+            missDelta: 0,
             isNewBest: false,
             score: 0,
         };
@@ -122,8 +123,9 @@ export class Anim {
 
     // ----- Wave-clear banner — gold "WAVE CLEAR" with scale-pop + hold + fade -----
     // Total ~2.5s (matches original _waveClearTimer = 2.5).
-    waveClearBanner(phase, onComplete) {
+    waveClearBanner(phase, scrapBonus, onComplete) {
         this.waveBanner.phase = phase;
+        this.waveBanner.scrapBonus = scrapBonus || 0;
         this.waveBanner.visible = true;
         this.waveBanner.alpha = 0;
         this.waveBanner.scale = 0.7;
@@ -220,10 +222,11 @@ export class Anim {
 
     // Game-over reveal — fades in the panel, pops the score with overshoot,
     // and (if a new personal best) animates a gold "NEW BEST" badge below.
-    gameOverReveal({ score, pbDelta = 0, isNewBest = false } = {}) {
+    gameOverReveal({ score, pbDelta = 0, isNewBest = false, missDelta = 0 } = {}) {
         Object.assign(this.gameOver, {
             score,
             pbDelta,
+            missDelta,
             isNewBest,
             alpha: 0,
             scoreScale: 0.5,
@@ -237,6 +240,10 @@ export class Anim {
             tl.to(this.gameOver, { pbAlpha: 1, pbScale: 1.0,
                 duration: 0.4, ease: 'back.out(2.0)' }, '+=0.2');
             tl.call(() => this.screenFlash({ color: '#ffdd00', intensity: 0.4, duration: 0.3 }), null, '-=0.3');
+        } else if (missDelta > 0) {
+            // Near-miss badge uses the same pop animation, no flash.
+            tl.to(this.gameOver, { pbAlpha: 1, pbScale: 1.0,
+                duration: 0.4, ease: 'back.out(2.0)' }, '+=0.2');
         }
         return this._track(tl);
     }

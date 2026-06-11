@@ -88,3 +88,30 @@ describe('Schemas loaders — corrupt-input recovery', () => {
         expect(Schemas.loadLeaderboard()).toEqual([]);
     });
 });
+
+describe('Schemas daily best', () => {
+    beforeEach(() => clearGameStorage());
+
+    it('starts a fresh record when nothing is stored', () => {
+        const rec = Schemas.updateDailyBest(1200, '2026-06-12');
+        expect(rec).toEqual({ date: '2026-06-12', score: 1200 });
+        expect(Schemas.loadDailyBest()).toEqual(rec);
+    });
+
+    it('keeps the higher score within the same day', () => {
+        Schemas.updateDailyBest(1200, '2026-06-12');
+        expect(Schemas.updateDailyBest(800, '2026-06-12').score).toBe(1200);
+        expect(Schemas.updateDailyBest(2000, '2026-06-12').score).toBe(2000);
+    });
+
+    it('resets on a new day', () => {
+        Schemas.updateDailyBest(5000, '2026-06-11');
+        const rec = Schemas.updateDailyBest(300, '2026-06-12');
+        expect(rec).toEqual({ date: '2026-06-12', score: 300 });
+    });
+
+    it('loadDailyBest returns null on corrupt data', () => {
+        localStorage.setItem('ninDefenderDaily', '{broken');
+        expect(Schemas.loadDailyBest()).toBeNull();
+    });
+});

@@ -96,10 +96,13 @@ describe('Shop cosmetics', () => {
         expect(trail.canPurchase(p)).toBe(true);
     });
 
-    it('SHIP SKIN apply cycles skinIndex', () => {
+    it('SHIP SKIN apply cycles only within unlocked skins', () => {
         const skin = SHOP_ITEMS.find(i => i.id === 'ship_skin');
         const p = new Player(mockCanvas, {});
         p.skinIndex = 0;
+        skin.apply(p);
+        expect(p.skinIndex).toBe(0); // nothing unlocked yet
+        p.unlockSkin(1);
         skin.apply(p);
         expect(p.skinIndex).toBe(1);
     });

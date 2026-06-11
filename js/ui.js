@@ -68,6 +68,31 @@ export class UIRenderer {
             ctx.shadowBlur = 0;
         }
 
+        // Skin unlock banner — centered, fades out over the last 0.5s
+        if (g.skinUnlockFlash) {
+            const alpha = Math.min(1, g.skinUnlockFlash.timer / 0.5);
+            const pulse = 0.8 + 0.2 * Math.sin(g.time * 6);
+            ctx.font = 'bold 24px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(0, 255, 204, ${alpha * pulse})`;
+            ctx.shadowColor = '#00ffcc';
+            ctx.shadowBlur = 14 * alpha;
+            ctx.fillText(g.skinUnlockFlash.text, w / 2, h * 0.3);
+            ctx.shadowBlur = 0;
+            ctx.textAlign = 'left';
+        }
+
+        // Combo milestone flash — fades out over its timer
+        if (g.comboMilestoneFlash) {
+            const alpha = Math.min(1, g.comboMilestoneFlash.timer / 0.5);
+            ctx.font = 'bold 18px Courier New';
+            ctx.fillStyle = `rgba(255, 221, 68, ${alpha})`;
+            ctx.shadowColor = '#ffaa00';
+            ctx.shadowBlur = 10 * alpha;
+            ctx.fillText(g.comboMilestoneFlash.text, 16, 110);
+            ctx.shadowBlur = 0;
+        }
+
         // Lives — top right (ship icons)
         for (let i = 0; i < g.player.lives; i++) {
             const lx = w - 30 - i * 30;
@@ -365,7 +390,9 @@ export class UIRenderer {
         ctx.fillStyle = g.player.trailColor || '#cc0000';
         ctx.fillText(`T: TRAIL [${g.player.trailColorNames[g.player.trailIndex]}]`, w - 16, h - 20);
         ctx.fillStyle = '#666';
-        ctx.fillText(`Y: SKIN [${g.player.skinNames[g.player.skinIndex]}]`, w - 16, h - 36);
+        const lockedSkins = g.player.skinNames.length - 1 - g.player.skinsUnlocked;
+        const lockHint = lockedSkins > 0 ? ` (${lockedSkins} LOCKED)` : '';
+        ctx.fillText(`Y: SKIN [${g.player.skinNames[g.player.skinIndex]}]${lockHint}`, w - 16, h - 36);
 
         ctx.restore();
     }
@@ -497,6 +524,10 @@ export class UIRenderer {
         ctx.font = '13px Courier New';
         ctx.fillStyle = '#aa8800';
         ctx.fillText(`PHASE ${wb.phase + 1} COMPLETE`, w / 2, h * 0.4 + 35);
+        if (wb.scrapBonus > 0) {
+            ctx.fillStyle = '#cc7700';
+            ctx.fillText(`+${wb.scrapBonus} SCRAP BONUS`, w / 2, h * 0.4 + 55);
+        }
 
         ctx.restore();
     }
@@ -581,18 +612,27 @@ export class UIRenderer {
 
         ctx.font = '16px Courier New';
         ctx.fillStyle = '#666';
-        ctx.fillText(`HIGH SCORE: ${g.highScore.toLocaleString()}`, w / 2, h * 0.56);
+        const dailyText = g.dailyBest ? `   |   TODAY'S BEST: ${g.dailyBest.toLocaleString()}` : '';
+        ctx.fillText(`HIGH SCORE: ${g.highScore.toLocaleString()}${dailyText}`, w / 2, h * 0.56);
 
         // NEW BEST badge — fades in with scale-pop after the score lands.
-        if (go.isNewBest && go.pbAlpha > 0) {
+        // Near-miss runs get a needling "N SHORT OF YOUR BEST" instead.
+        if (go.pbAlpha > 0 && (go.isNewBest || go.missDelta > 0)) {
             ctx.save();
             ctx.globalAlpha = go.pbAlpha;
             const pbScale = Math.max(0.001, go.pbScale);
             ctx.font = `bold ${18 * pbScale}px Courier New`;
-            ctx.fillStyle = '#ffdd00';
-            ctx.shadowColor = '#ffdd00';
-            ctx.shadowBlur = 12;
-            ctx.fillText(`★ NEW BEST  +${go.pbDelta.toLocaleString()}`, w / 2, h * 0.51);
+            if (go.isNewBest) {
+                ctx.fillStyle = '#ffdd00';
+                ctx.shadowColor = '#ffdd00';
+                ctx.shadowBlur = 12;
+                ctx.fillText(`★ NEW BEST  +${go.pbDelta.toLocaleString()}`, w / 2, h * 0.51);
+            } else {
+                ctx.fillStyle = '#ff6633';
+                ctx.shadowColor = '#ff6633';
+                ctx.shadowBlur = 8;
+                ctx.fillText(`${go.missDelta.toLocaleString()} SHORT OF YOUR BEST`, w / 2, h * 0.51);
+            }
             ctx.restore();
         }
 
@@ -604,6 +644,10 @@ export class UIRenderer {
             ctx.fillStyle = '#993300';
             ctx.fillText(`MAX COMBO: x${g.player.maxCombo}`, w / 2, h * 0.66);
         }
+        const runSecs = Math.floor(g.time);
+        const runClock = `${Math.floor(runSecs / 60)}:${(runSecs % 60).toString().padStart(2, '0')}`;
+        ctx.fillStyle = '#555';
+        ctx.fillText(`PHASE ${g.lastPhase + 1} REACHED — ${runClock}`, w / 2, h * 0.70);
 
         // Leaderboard
         if (g.leaderboard.length > 0) {

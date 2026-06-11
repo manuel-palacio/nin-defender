@@ -23,6 +23,72 @@ describe('Player.getComboMultiplier', () => {
     });
 });
 
+describe('Player.registerKill milestone rewards', () => {
+    it('returns the milestone when combo crosses 10, 25, 50', () => {
+        const p = new Player(mockCanvas, noAssets);
+        const results = [];
+        for (let i = 0; i < 50; i++) results.push(p.registerKill());
+        expect(results[9]).toBe(10);
+        expect(results[24]).toBe(25);
+        expect(results[49]).toBe(50);
+    });
+
+    it('returns null on non-milestone kills', () => {
+        const p = new Player(mockCanvas, noAssets);
+        for (let i = 0; i < 9; i++) {
+            expect(p.registerKill()).toBeNull();
+        }
+        p.registerKill(); // 10th
+        expect(p.registerKill()).toBeNull(); // 11th
+    });
+
+    it('fires again after a combo reset', () => {
+        const p = new Player(mockCanvas, noAssets);
+        for (let i = 0; i < 10; i++) p.registerKill();
+        p.combo = 0; // simulate timer reset
+        let milestone = null;
+        for (let i = 0; i < 10; i++) milestone = p.registerKill();
+        expect(milestone).toBe(10);
+    });
+});
+
+describe('Player skin unlocks', () => {
+    it('starts with only CLASSIC unlocked', () => {
+        const p = new Player(mockCanvas, noAssets);
+        expect(p.skinsUnlocked).toBe(0);
+    });
+
+    it('cycleSkin stays on CLASSIC when nothing else is unlocked', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.cycleSkin();
+        expect(p.skinIndex).toBe(0);
+    });
+
+    it('unlockSkin(1) makes STEALTH cyclable and persists', () => {
+        const p = new Player(mockCanvas, noAssets);
+        expect(p.unlockSkin(1)).toBe(true);
+        p.cycleSkin();
+        expect(p.skinIndex).toBe(1);
+        p.cycleSkin();
+        expect(p.skinIndex).toBe(0); // wraps within unlocked set
+        const p2 = new Player(mockCanvas, noAssets);
+        expect(p2.skinsUnlocked).toBe(1);
+    });
+
+    it('unlockSkin returns false when already unlocked', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.unlockSkin(2);
+        expect(p.unlockSkin(2)).toBe(false);
+        expect(p.unlockSkin(1)).toBe(false); // lower than current
+    });
+
+    it('clamps a saved skinIndex above the unlocked ceiling', () => {
+        localStorage.setItem('ninDefenderSkin', '3');
+        const p = new Player(mockCanvas, noAssets);
+        expect(p.skinIndex).toBe(0);
+    });
+});
+
 describe('Player.hit()', () => {
     it('with active shield absorbs damage and does not decrement lives', () => {
         const p = new Player(mockCanvas, noAssets);

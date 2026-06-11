@@ -72,6 +72,8 @@ export class Game {
         this.state = STATE.MENU;
         this.score = 0;
         this.highScore = Schemas.loadHighScore();
+        const daily = Schemas.loadDailyBest();
+        this.dailyBest = daily && daily.date === Schemas.localDateString() ? daily.score : 0;
         this.time = 0;
         this.powerupTimer = 0;
 
@@ -98,6 +100,8 @@ export class Game {
         // Upgrade shop
         this.shop = new Shop();
         this.scrapPulse = 0;
+        this.comboMilestoneFlash = null; // { text, timer } — HUD flash on combo milestones
+        this.skinUnlockFlash = null;     // { text, timer } — banner when a skin unlocks
 
         // GSAP-driven cinematic time source (monotonic; pauses with the game)
         this.gameTime = 0;
@@ -123,9 +127,9 @@ export class Game {
         this.difficulties = ['EASY', 'NORMAL', 'BRUTAL'];
         this.difficultyIndex = Schemas.loadDifficulty();
         this.difficultySettings = {
-            EASY:   { lives: 8, baseInterval: 2.8, bulletSpeedMul: 0.5 },
-            NORMAL: { lives: 6, baseInterval: 2.2, bulletSpeedMul: 1.0 },
-            BRUTAL: { lives: 4, baseInterval: 1.6, bulletSpeedMul: 1.3 },
+            EASY:   { lives: 8, baseInterval: 2.0, bulletSpeedMul: 0.5 },
+            NORMAL: { lives: 6, baseInterval: 1.5, bulletSpeedMul: 1.0 },
+            BRUTAL: { lives: 4, baseInterval: 1.1, bulletSpeedMul: 1.3 },
         };
 
         // Menu animation
@@ -195,6 +199,8 @@ export class Game {
         this.anim.stopMenuLoops();
         this.anim.stopVignette();
         this._hitStopFrames = 0;
+        this.comboMilestoneFlash = null;
+        this.skinUnlockFlash = null;
         this.state = STATE.PLAYING;
         this.score = 0;
         this.time = 0;
@@ -258,11 +264,14 @@ export class Game {
         const prevBest = this.highScore;
         const isNewBest = this.score > prevBest;
         const pbDelta = isNewBest ? this.score - prevBest : 0;
+        // Near-miss hook: "N SHORT OF YOUR BEST" stings just enough for one more run.
+        const missDelta = !isNewBest && prevBest > 0 ? prevBest - this.score : 0;
         if (isNewBest) {
             this.highScore = this.score;
             localStorage.setItem('ninDefenderHigh', this.highScore.toString());
         }
-        this.anim.gameOverReveal({ score: this.score, pbDelta, isNewBest });
+        this.dailyBest = Schemas.updateDailyBest(this.score).score;
+        this.anim.gameOverReveal({ score: this.score, pbDelta, isNewBest, missDelta });
         // Save scrap earned and update leaderboard
         this.player.addScrap(0); // ensure saved
         this.addToLeaderboard(this.score);
@@ -284,6 +293,15 @@ export class Game {
         this.leaderboard.sort((a, b) => b.score - a.score);
         this.leaderboard = this.leaderboard.slice(0, 10);
         localStorage.setItem('ninDefenderLeaderboard', JSON.stringify(this.leaderboard));
+    }
+
+    awardComboMilestone(milestone, x, y) {
+        this.player.addScrap(milestone);
+        this.scrapPulse = 1.0;
+        this.comboMilestoneFlash = { text: `COMBO ${milestone}! +${milestone} SCRAP`, timer: 1.5 };
+        this.particles.createColorExplosion(x, y,
+            ['#ffaa00', '#ffdd44', '#ffffff'], 24, 260, 0.7, 4);
+        this.audio.playPowerUp();
     }
 
     resize(w, h) {
@@ -475,6 +493,14 @@ export class Game {
 
         // --- PLAYING ---
         this.time += dt;
+        if (this.comboMilestoneFlash) {
+            this.comboMilestoneFlash.timer -= dt;
+            if (this.comboMilestoneFlash.timer <= 0) this.comboMilestoneFlash = null;
+        }
+        if (this.skinUnlockFlash) {
+            this.skinUnlockFlash.timer -= dt;
+            if (this.skinUnlockFlash.timer <= 0) this.skinUnlockFlash = null;
+        }
         // Time Warp slows the world (enemies, bullets, particles, hazards) but not the
         // player or spawn timers — the player should feel responsive while everything
         // around them drifts. Spawn rates stay on real dt so warp doesn't starve you.
@@ -539,14 +565,19 @@ export class Game {
             const beamX = this.player.x + this.player.width / 2;
             const beamY = this.player.y;
             const beamHalfWidth = 14;
-            const dmgPerSec = 3;
+            // Beam damage scales with the combo multiplier; laser kills feed the
+            // combo (regular shooting is disabled while the beam runs).
+            const dmgPerSec = 3 * this.player.getComboMultiplier();
             const dmgThisFrame = dmgPerSec * dt;
             for (const e of this.spawner.enemies) {
                 if (!e.active || e.x < beamX) continue;
                 if (Math.abs(e.y - beamY) > (e.radius || 0) + beamHalfWidth) continue;
                 const killed = e.takeDamage(dmgThisFrame);
                 if (killed) {
-                    this.score += 10;
+                    e.active = false;
+                    const milestone = this.player.registerKill();
+                    if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
+                    this.score += Math.floor(e.points * this.player.getComboMultiplier());
                     this.particles.createColorExplosion(e.x, e.y,
                         ['#ff0066', '#ffffff', '#ff8800'], 20, 250, 0.6, 4);
                 }
@@ -594,6 +625,16 @@ export class Game {
             this.anim.phaseAnnounce(phaseInfo.name,
                 { color: phaseInfo.color, duration: 4.0 });
             this.phaseStartTime = this.time;
+
+            // Skin unlocks — STEALTH/VIPER/TANK gated at phases 3/6/9
+            const skinGate = currentPhase >= 9 ? 3 : currentPhase >= 6 ? 2 : currentPhase >= 3 ? 1 : 0;
+            if (skinGate > 0 && this.player.unlockSkin(skinGate)) {
+                this.skinUnlockFlash = {
+                    text: `NEW SHIP UNLOCKED: ${this.player.skinNames[skinGate]} [Y]`,
+                    timer: 5.0
+                };
+                this.audio.playPowerUp();
+            }
 
             // Clear all non-boss enemies for a clean phase transition
             if (currentPhase > 0) {
@@ -818,7 +859,8 @@ export class Game {
                     if (killed) {
                         e.active = false;
                         // Combo + score
-                        this.player.registerKill();
+                        const milestone = this.player.registerKill();
+                        if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
                         const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
                         this.score += Math.floor(e.points * multiplier);
                         // Scrap drops (1-3 per kill)
@@ -894,15 +936,20 @@ export class Game {
                         const fx = explosionMap[e.type] || explosionMap.asteroid;
                         this.particles.createColorExplosion(e.x, e.y, fx.colors,
                             fx.count, 300, 0.8, 5);
+                        this.particles.createShockwave(e.x, e.y, fx.colors[0]);
                         this.shake.shake(fx.shake, 0.15);
                         this.audio.playExplosion();
 
                         // Boss kill — trigger cinematic, then wave-clear banner, then shop.
                         if (e.type === 'boss') {
                             const phase = this.lastPhase;
+                            // Wave-clear scrap bonus scales with the phase just beaten.
+                            const waveBonus = 20 * (phase + 1);
+                            this.player.addScrap(waveBonus);
+                            this.scrapPulse = 1.0;
                             this.anim.bossKillCinematic(e.x, e.y, () => {
                                 this.state = STATE.WAVE_CLEAR;
-                                this.anim.waveClearBanner(phase, () => {
+                                this.anim.waveClearBanner(phase, waveBonus, () => {
                                     this.state = STATE.SHOP;
                                     this.shop.selectedIndex = 0;
                                 });
@@ -919,7 +966,8 @@ export class Game {
                                 const chainKill = other.takeDamage(1);
                                 if (chainKill) {
                                     other.active = false;
-                                    this.player.registerKill();
+                                    const chainMilestone = this.player.registerKill();
+                                    if (chainMilestone) this.awardComboMilestone(chainMilestone, other.x, other.y);
                                     this.score += Math.floor(other.points * this.player.getComboMultiplier());
                                     this.particles.createColorExplosion(other.x, other.y,
                                         ['#ff6600', '#ffaa00', '#ffffff'], 20, 250, 0.6, 4);
@@ -965,7 +1013,17 @@ export class Game {
             for (let i = this.powerups.length - 1; i >= 0; i--) {
                 const pu = this.powerups[i];
                 if (Utils.circleCollision(pu.x, pu.y, pu.radius, px, py, pr + 5)) {
+                    // Dud-proofing: EXTRA_LIFE at full health converts to score
+                    if (pu.type === 'EXTRA_LIFE' && this.player.lives >= this.player.maxLives) {
+                        this.score += 500;
+                        this.comboMilestoneFlash = { text: 'MAX LIVES — +500 PTS', timer: 1.5 };
+                    }
                     this.player.applyPowerUp(pu.type);
+                    // Nuke Overcharge with bombs in reserve: instant free detonation
+                    // on pickup (the intercept buff still applies afterwards).
+                    if (pu.type === 'NUKE_OVERCHARGE' && this.player.bombs > 0) {
+                        emitter.emit('bomb:requested', { x: px, y: py });
+                    }
                     const info = POWERUP_TYPES[pu.type];
                     this.particles.createExplosion(pu.x, pu.y, info.color, 15, 150, 0.4, 3);
                     this.audio.playPowerUp();

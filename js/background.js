@@ -158,6 +158,7 @@ class Moon {
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.2;
         this.radius = Math.min(canvas.width, canvas.height) * 0.15;
+        this._bodyGrad = null;
         this.generateFeatures();
     }
 
@@ -179,12 +180,15 @@ class Moon {
             return;
         }
 
-        // Moon body — subtle gradient
-        const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
-        grad.addColorStop(0, '#e8e0d0');
-        grad.addColorStop(0.6, '#c4b89a');
-        grad.addColorStop(1, '#8a7e68');
-        ctx.fillStyle = grad;
+        // Moon body — subtle gradient (cached; position only changes on resize)
+        if (!this._bodyGrad) {
+            const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
+            grad.addColorStop(0, '#e8e0d0');
+            grad.addColorStop(0.6, '#c4b89a');
+            grad.addColorStop(1, '#8a7e68');
+            this._bodyGrad = grad;
+        }
+        ctx.fillStyle = this._bodyGrad;
         ctx.shadowColor = 'rgba(200, 190, 170, 0.4)';
         ctx.shadowBlur = 40;
         ctx.beginPath();
@@ -305,6 +309,7 @@ class Mars {
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.22;
         this.radius = Math.min(canvas.width, canvas.height) * 0.15;
+        this._bodyGrad = null;
         this.generateFeatures();
     }
 
@@ -315,13 +320,16 @@ class Mars {
 
         ctx.save();
 
-        // Planet body — rusty red gradient
-        const grad = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.05, x, y, r);
-        grad.addColorStop(0, '#d4845a');
-        grad.addColorStop(0.4, '#c06030');
-        grad.addColorStop(0.8, '#8b3a1a');
-        grad.addColorStop(1, '#4a1a08');
-        ctx.fillStyle = grad;
+        // Planet body — rusty red gradient (cached; position only changes on resize)
+        if (!this._bodyGrad) {
+            const grad = ctx.createRadialGradient(x - r * 0.25, y - r * 0.25, r * 0.05, x, y, r);
+            grad.addColorStop(0, '#d4845a');
+            grad.addColorStop(0.4, '#c06030');
+            grad.addColorStop(0.8, '#8b3a1a');
+            grad.addColorStop(1, '#4a1a08');
+            this._bodyGrad = grad;
+        }
+        ctx.fillStyle = this._bodyGrad;
         ctx.shadowColor = 'rgba(200, 100, 50, 0.3)';
         ctx.shadowBlur = 35;
         ctx.beginPath();
@@ -406,6 +414,7 @@ class GasGiant {
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.25;
         this.radius = Math.min(canvas.width, canvas.height) * 0.18;
+        this._bodyGrad = null;
         this.generateFeatures();
     }
 
@@ -416,12 +425,15 @@ class GasGiant {
 
         ctx.save();
 
-        // Planet body
-        const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
-        grad.addColorStop(0, '#e8c898');
-        grad.addColorStop(0.5, '#c49060');
-        grad.addColorStop(1, '#6a4020');
-        ctx.fillStyle = grad;
+        // Planet body (gradient cached; position only changes on resize)
+        if (!this._bodyGrad) {
+            const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
+            grad.addColorStop(0, '#e8c898');
+            grad.addColorStop(0.5, '#c49060');
+            grad.addColorStop(1, '#6a4020');
+            this._bodyGrad = grad;
+        }
+        ctx.fillStyle = this._bodyGrad;
         ctx.shadowColor = 'rgba(200, 160, 100, 0.3)';
         ctx.shadowBlur = 40;
         ctx.beginPath();
@@ -498,6 +510,7 @@ class IcePlanet {
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.2;
         this.radius = Math.min(canvas.width, canvas.height) * 0.13;
+        this._bodyGrad = null;
         this.generateFeatures();
     }
 
@@ -508,13 +521,16 @@ class IcePlanet {
 
         ctx.save();
 
-        // Planet body — icy blue
-        const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.3, r * 0.05, x, y, r);
-        grad.addColorStop(0, '#e8f4ff');
-        grad.addColorStop(0.3, '#a8d8ea');
-        grad.addColorStop(0.7, '#5090b0');
-        grad.addColorStop(1, '#1a3a50');
-        ctx.fillStyle = grad;
+        // Planet body — icy blue (gradient cached; position only changes on resize)
+        if (!this._bodyGrad) {
+            const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.3, r * 0.05, x, y, r);
+            grad.addColorStop(0, '#e8f4ff');
+            grad.addColorStop(0.3, '#a8d8ea');
+            grad.addColorStop(0.7, '#5090b0');
+            grad.addColorStop(1, '#1a3a50');
+            this._bodyGrad = grad;
+        }
+        ctx.fillStyle = this._bodyGrad;
         ctx.shadowColor = 'rgba(100, 180, 255, 0.4)';
         ctx.shadowBlur = 30;
         ctx.beginPath();
@@ -591,6 +607,7 @@ class RingedPlanet {
         this.baseX = canvas.width * 0.75;
         this.baseY = canvas.height * 0.25;
         this.radius = Math.min(canvas.width, canvas.height) * 0.12;
+        this._bodyGrad = null;
     }
 
     draw(ctx, time) {
@@ -604,12 +621,15 @@ class RingedPlanet {
         // Back half of rings (behind planet)
         this.drawRings(ctx, x, y, r, time, true);
 
-        // Planet body
-        const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.05, x, y, r);
-        grad.addColorStop(0, t.body[0]);
-        grad.addColorStop(0.6, t.body[1]);
-        grad.addColorStop(1, t.body[2]);
-        ctx.fillStyle = grad;
+        // Planet body (gradient cached; position only changes on resize)
+        if (!this._bodyGrad) {
+            const grad = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.05, x, y, r);
+            grad.addColorStop(0, t.body[0]);
+            grad.addColorStop(0.6, t.body[1]);
+            grad.addColorStop(1, t.body[2]);
+            this._bodyGrad = grad;
+        }
+        ctx.fillStyle = this._bodyGrad;
         ctx.shadowColor = t.glow;
         ctx.shadowBlur = 30;
         ctx.beginPath();
@@ -1006,6 +1026,7 @@ export class Background {
 
     resize(canvas) {
         this.canvas = canvas;
+        this._skyGrad = null;
         this.celestialBody.resize(canvas);
         this.buildLayers();
     }
@@ -1020,12 +1041,15 @@ export class Background {
     }
 
     draw(ctx) {
-        // Deep space gradient
-        const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        grad.addColorStop(0, '#0a0a1f');
-        grad.addColorStop(0.5, '#0d0d2b');
-        grad.addColorStop(1, '#0a0a1f');
-        ctx.fillStyle = grad;
+        // Deep space gradient — cached; rebuilt only on resize
+        if (!this._skyGrad) {
+            const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+            grad.addColorStop(0, '#0a0a1f');
+            grad.addColorStop(0.5, '#0d0d2b');
+            grad.addColorStop(1, '#0a0a1f');
+            this._skyGrad = grad;
+        }
+        ctx.fillStyle = this._skyGrad;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         // Distant stars

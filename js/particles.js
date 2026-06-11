@@ -168,6 +168,21 @@ export class ParticlePool {
         );
     }
 
+    // Evenly-spaced particles at uniform speed read as an expanding ring.
+    createShockwave(x, y, color, count = 16, speed = 320) {
+        for (let i = 0; i < count; i++) {
+            const p = this.get();
+            if (!p) continue;
+            const angle = (i / count) * Math.PI * 2;
+            p.init(
+                x, y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                0.35, 2.5, color, true, 0.92
+            );
+        }
+    }
+
     createMuzzleFlash(x, y, angle, color) {
         for (let i = 0; i < 5; i++) {
             const p = this.get();

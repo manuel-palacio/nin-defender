@@ -12,26 +12,28 @@ import { AlienDevil } from './alien-devil.js'
 import { Boss } from './boss.js'
 
 export const PHASES = [
-    // Re-pushed ~5x for early phases — combo + power-combo + pierce-bug fix
-    // changed the kill rate enough that the previous numbers blew through 5
-    // phases in ~30s. New curve targets ~2 minutes for phases 1-5.
+    // Tuned against a live play-test (2026-06): the previous curve (3000 for
+    // phase 1) left an average run stuck in ASTEROID FIELD for 3+ minutes.
+    // Early thresholds are compressed so the first transition lands within
+    // ~45s and the first boss within ~2 minutes; late phases stay close to
+    // the old values since faster spawning already accelerates scoring.
     { name: 'ASTEROID FIELD',     threshold: 0,     featured: 'asteroid',  color: '#aa7733' },
-    { name: 'CRITTER COLONY',     threshold: 3000,  featured: 'ship',      color: '#ff6644' },
-    { name: 'FIREFLY SWARM',      threshold: 6500,  featured: 'drone',     color: '#44ff66' },
-    { name: 'JELLYFISH DRIFT',    threshold: 11000, featured: 'mine',      color: '#ff88cc' },
-    { name: 'ARACHNID SECTOR',    threshold: 17000, featured: 'spider',    color: '#66ff22' },
-    { name: 'GHOST NEBULA',       threshold: 24000, featured: 'ghost',     color: '#bb66ff' },
-    { name: 'OCTOPUS DEN',        threshold: 32000, featured: 'bomber',    color: '#cc44ff' },
-    { name: 'CHAMELEON VOID',     threshold: 41000, featured: 'stealth',   color: '#00cccc' },
-    { name: 'DEVIL\'S DOMAIN',    threshold: 52000, featured: 'devil',     color: '#ff4400' },
-    { name: 'TOTAL CHAOS',        threshold: 65000, featured: 'all',       color: '#ff3366' }
+    { name: 'CRITTER COLONY',     threshold: 1500,  featured: 'ship',      color: '#ff6644' },
+    { name: 'FIREFLY SWARM',      threshold: 4000,  featured: 'drone',     color: '#44ff66' },
+    { name: 'JELLYFISH DRIFT',    threshold: 7500,  featured: 'mine',      color: '#ff88cc' },
+    { name: 'ARACHNID SECTOR',    threshold: 12000, featured: 'spider',    color: '#66ff22' },
+    { name: 'GHOST NEBULA',       threshold: 18000, featured: 'ghost',     color: '#bb66ff' },
+    { name: 'OCTOPUS DEN',        threshold: 26000, featured: 'bomber',    color: '#cc44ff' },
+    { name: 'CHAMELEON VOID',     threshold: 35000, featured: 'stealth',   color: '#00cccc' },
+    { name: 'DEVIL\'S DOMAIN',    threshold: 46000, featured: 'devil',     color: '#ff4400' },
+    { name: 'TOTAL CHAOS',        threshold: 58000, featured: 'all',       color: '#ff3366' }
 ];
 
 export class EnemySpawner {
     constructor(assets) {
         this.assets = assets || {};
         this.timer = 0;
-        this.baseInterval = 2.2;
+        this.baseInterval = 1.5;
         this.enemies = [];
         this.currentPhase = 0;
         this.phaseAnnouncedAt = -1; // score when last announcement was shown
@@ -44,8 +46,15 @@ export class EnemySpawner {
         return 0;
     }
 
+    // Smooth exponential spawn interval — no cliff between phases.
+    // baseInterval comes from the difficulty setting (EASY/NORMAL/BRUTAL).
+    getSpawnInterval(phase) {
+        return Math.max(0.45, this.baseInterval * Math.pow(0.82, phase));
+    }
+
     update(dt, score, canvasW, canvasH, projectilePool, playerY, audio, playerX) {
         this.timer -= dt;
+        this._t = (this._t || 0) + dt;
 
         // Phase check
         const phase = this.getPhase(score);
@@ -55,12 +64,12 @@ export class EnemySpawner {
         }
 
         const phaseInfo = PHASES[this.currentPhase];
-        // Smooth exponential spawn interval — no cliff between phases
-        const interval = Math.max(0.45, 2.2 * Math.pow(0.82, phase));
+        const interval = this.getSpawnInterval(phase);
         const largeTier = phase >= 5 ? 0.2 : 0;
 
         if (this.timer <= 0) {
             this.timer = interval + Utils.random(-0.3, 0.3);
+            const spawnStart = this.enemies.length;
 
             const roll = Math.random();
             const featured = phaseInfo.featured;
@@ -89,6 +98,14 @@ export class EnemySpawner {
                 const e = this._spawnFromBehind(pick, canvasW, canvasH);
                 if (e) this.enemies.push(e);
             }
+
+            // Elite escalation — DEVIL'S DOMAIN onward, a quarter of spawns
+            // come back tougher and worth more.
+            if (phase >= 8) {
+                for (let i = spawnStart; i < this.enemies.length; i++) {
+                    if (Math.random() < 0.25) this.makeElite(this.enemies[i]);
+                }
+            }
         }
 
         // Update all enemies
@@ -112,6 +129,13 @@ export class EnemySpawner {
                 this.enemies.splice(i, 1);
             }
         }
+    }
+
+    makeElite(e) {
+        e.elite = true;
+        e.hp *= 2;
+        e.maxHp *= 2;
+        e.points = Math.floor(e.points * 1.5);
     }
 
     spawnByType(type, canvasW, canvasH, largeTier) {
@@ -279,8 +303,23 @@ export class EnemySpawner {
 
     draw(ctx) {
         for (const e of this.enemies) {
-            if (e.active) e.draw(ctx);
+            if (!e.active) continue;
+            if (e.elite) this._drawEliteAura(ctx, e);
+            e.draw(ctx);
         }
+    }
+
+    _drawEliteAura(ctx, e) {
+        const pulse = 0.5 + 0.3 * Math.sin((this._t || 0) * 6);
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 0, 68, ${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#ff0044';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, (e.radius || 12) + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
     }
 
     reset() {

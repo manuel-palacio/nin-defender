@@ -118,9 +118,10 @@ export class Player {
         this.trailIndex = Schemas.loadTrail();
         this.trailColor = this.trailColors[this.trailIndex];
 
-        // Ship skins
+        // Ship skins — locked skins unlock by reaching phases (3/6/9)
         this.skinNames = ['CLASSIC', 'STEALTH', 'VIPER', 'TANK'];
-        this.skinIndex = Schemas.loadSkin();
+        this.skinsUnlocked = Schemas.loadSkinsUnlocked(); // highest unlocked index
+        this.skinIndex = Math.min(Schemas.loadSkin(), this.skinsUnlocked);
 
         // Combo system (tracked here for score integration)
         this.combo = 0;
@@ -319,10 +320,17 @@ export class Player {
     }
 
     cycleSkin() {
-        this.skinIndex = (this.skinIndex + 1) % this.skinNames.length;
+        this.skinIndex = (this.skinIndex + 1) % (this.skinsUnlocked + 1);
         localStorage.setItem('ninDefenderSkin', this.skinIndex.toString());
         // Re-apply so the new skin's passive (speed/dmg/maxLives/triple) takes effect.
         this.applyUpgrades();
+    }
+
+    unlockSkin(index) {
+        if (index <= this.skinsUnlocked || index >= this.skinNames.length) return false;
+        this.skinsUnlocked = index;
+        localStorage.setItem('ninDefenderSkinsUnlocked', this.skinsUnlocked.toString());
+        return true;
     }
 
     _drawShipSkin(ctx, skin) {
@@ -444,6 +452,11 @@ export class Player {
         this.combo++;
         this.comboTimer = this.comboDuration;
         if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+        // Exact-equality crossing: each milestone fires once per streak.
+        if (this.combo === 10 || this.combo === 25 || this.combo === 50) {
+            return this.combo;
+        }
+        return null;
     }
 
     getComboMultiplier() {
