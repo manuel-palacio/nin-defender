@@ -157,77 +157,97 @@ export class AudioManager {
     }
 
     playExplosion() {
-        if (!this.ctx || this.muted) return;
-        const now = this.ctx.currentTime;
-
-        // Layer 1: Punchy low thump
-        const osc = this.ctx.createOscillator();
-        const oscGain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(120, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
-        oscGain.gain.setValueAtTime(1.0, now);
-        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-        osc.connect(oscGain);
-        oscGain.connect(this.sfxGain);
-        osc.start(now);
-        osc.stop(now + 0.3);
-
-        // Layer 2: Noise crackle with resonance
-        const len = 0.5;
-        const bufferSize = Math.floor(this.ctx.sampleRate * len);
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / bufferSize;
-            const env = t < 0.05 ? t / 0.05 : Math.pow(1 - t, 2);
-            data[i] = (Math.random() * 2 - 1) * env;
-        }
-        const source = this.ctx.createBufferSource();
-        source.buffer = buffer;
-        const noiseGain = this.ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.8, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + len);
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(3500, now);
-        filter.frequency.exponentialRampToValueAtTime(60, now + len);
-        filter.Q.setValueAtTime(5, now);
-        filter.Q.linearRampToValueAtTime(0.5, now + len * 0.5);
-        source.connect(filter);
-        filter.connect(noiseGain);
-        noiseGain.connect(this.sfxGain);
-        source.start(now);
-
-        // Layer 3: Mid-frequency crunch (delayed slightly)
-        const osc2 = this.ctx.createOscillator();
-        const osc2Gain = this.ctx.createGain();
-        osc2.type = 'sawtooth';
-        osc2.frequency.setValueAtTime(200, now + 0.02);
-        osc2.frequency.exponentialRampToValueAtTime(40, now + 0.25);
-        osc2Gain.gain.setValueAtTime(0, now);
-        osc2Gain.gain.linearRampToValueAtTime(0.4, now + 0.02);
-        osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc2.connect(osc2Gain);
-        osc2Gain.connect(this.sfxGain);
-        osc2.start(now);
-        osc2.stop(now + 0.25);
+        this._explosion(1.0);
     }
 
     playSmallExplosion() {
+        this._explosion(0.5);
+    }
+
+    // Soft-clip curve for the explosion body — gives the noise a saturated
+    // crunch instead of a clean hiss. Built once, reused by every blast.
+    _getDistortionCurve() {
+        if (!this._distCurve) {
+            const n = 256;
+            this._distCurve = new Float32Array(n);
+            for (let i = 0; i < n; i++) {
+                const x = (i / (n - 1)) * 2 - 1;
+                this._distCurve[i] = Math.tanh(2.5 * x);
+            }
+        }
+        return this._distCurve;
+    }
+
+    // Shared explosion recipe. size 1.0 = full kill blast, smaller values
+    // scale length, pitch, and loudness for chain kills / minor pops.
+    // Each blast is pitch-randomized so back-to-back kills don't loop.
+    _explosion(size) {
         if (!this.ctx || this.muted) return;
         const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
-        gain.gain.setValueAtTime(0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-        osc.connect(gain);
-        gain.connect(this.sfxGain);
-        osc.start(now);
-        osc.stop(now + 0.15);
+        const vary = 0.85 + Math.random() * 0.3;
+
+        // Layer 1: detonation crack — high-passed noise snap (the "bang")
+        const crackLen = 0.03;
+        const crackSize = Math.floor(this.ctx.sampleRate * crackLen);
+        const crackBuf = this.ctx.createBuffer(1, crackSize, this.ctx.sampleRate);
+        const crackData = crackBuf.getChannelData(0);
+        for (let i = 0; i < crackSize; i++) {
+            crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
+        }
+        const crack = this.ctx.createBufferSource();
+        crack.buffer = crackBuf;
+        const crackHp = this.ctx.createBiquadFilter();
+        crackHp.type = 'highpass';
+        crackHp.frequency.setValueAtTime(1500, now);
+        const crackGain = this.ctx.createGain();
+        crackGain.gain.setValueAtTime(0.55 * size, now);
+        crack.connect(crackHp);
+        crackHp.connect(crackGain);
+        crackGain.connect(this.sfxGain);
+        crack.start(now);
+
+        // Layer 2: low thump — pitch varies per blast
+        const thumpLen = 0.18 + 0.15 * size;
+        const thump = this.ctx.createOscillator();
+        const thumpGain = this.ctx.createGain();
+        thump.type = 'sine';
+        thump.frequency.setValueAtTime(120 * vary, now);
+        thump.frequency.exponentialRampToValueAtTime(32, now + thumpLen);
+        thumpGain.gain.setValueAtTime(0.9 * size, now);
+        thumpGain.gain.exponentialRampToValueAtTime(0.001, now + thumpLen);
+        thump.connect(thumpGain);
+        thumpGain.connect(this.sfxGain);
+        thump.start(now);
+        thump.stop(now + thumpLen);
+
+        // Layer 3: saturated noise body through a falling lowpass — the
+        // debris/fire rumble that gives the blast its tail
+        const bodyLen = 0.2 + 0.3 * size;
+        const bodySize = Math.floor(this.ctx.sampleRate * bodyLen);
+        const bodyBuf = this.ctx.createBuffer(1, bodySize, this.ctx.sampleRate);
+        const bodyData = bodyBuf.getChannelData(0);
+        for (let i = 0; i < bodySize; i++) {
+            const t = i / bodySize;
+            const env = t < 0.04 ? t / 0.04 : Math.pow(1 - t, 2);
+            bodyData[i] = (Math.random() * 2 - 1) * env;
+        }
+        const body = this.ctx.createBufferSource();
+        body.buffer = bodyBuf;
+        const shaper = this.ctx.createWaveShaper();
+        shaper.curve = this._getDistortionCurve();
+        const bodyLp = this.ctx.createBiquadFilter();
+        bodyLp.type = 'lowpass';
+        bodyLp.frequency.setValueAtTime(3200 * vary, now);
+        bodyLp.frequency.exponentialRampToValueAtTime(90, now + bodyLen);
+        bodyLp.Q.setValueAtTime(2, now);
+        const bodyGain = this.ctx.createGain();
+        bodyGain.gain.setValueAtTime(0.7 * size, now);
+        bodyGain.gain.exponentialRampToValueAtTime(0.001, now + bodyLen);
+        body.connect(shaper);
+        shaper.connect(bodyLp);
+        bodyLp.connect(bodyGain);
+        bodyGain.connect(this.sfxGain);
+        body.start(now);
     }
 
     // Non-lethal bullet impact — bright spark sizzle, NOT the low sine thump
@@ -320,20 +340,67 @@ export class AudioManager {
         osc2.stop(now + 1.5);
     }
 
+    // Player took damage — metallic grind + dissonant alarm stab. Harsher
+    // and more midrange than the explosion recipe so losing a life cuts
+    // through the mix and feels like YOUR hull, not another enemy popping.
     playHit() {
         if (!this.ctx || this.muted) return;
         const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(180, now);
-        osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.connect(gain);
-        gain.connect(this.sfxGain);
-        osc.start(now);
-        osc.stop(now + 0.25);
+
+        // Layer 1: distorted noise grind — metal scraping metal
+        const len = 0.16;
+        const size = Math.floor(this.ctx.sampleRate * len);
+        const buffer = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < size; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / size, 1.2);
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const shaper = this.ctx.createWaveShaper();
+        shaper.curve = this._getDistortionCurve();
+        const bp = this.ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.setValueAtTime(900, now);
+        bp.frequency.exponentialRampToValueAtTime(250, now + len);
+        bp.Q.setValueAtTime(1.2, now);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.5, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + len);
+        noise.connect(shaper);
+        shaper.connect(bp);
+        bp.connect(noiseGain);
+        noiseGain.connect(this.sfxGain);
+        noise.start(now);
+
+        // Layer 2: dissonant two-osc stab (tritone) — the alarm quality
+        const stabLen = 0.22;
+        const stabGain = this.ctx.createGain();
+        stabGain.gain.setValueAtTime(0.22, now);
+        stabGain.gain.exponentialRampToValueAtTime(0.001, now + stabLen);
+        stabGain.connect(this.sfxGain);
+        for (const f of [160, 226]) {
+            const osc = this.ctx.createOscillator();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(f, now);
+            osc.frequency.exponentialRampToValueAtTime(f * 0.35, now + stabLen);
+            osc.connect(stabGain);
+            osc.start(now);
+            osc.stop(now + stabLen);
+        }
+
+        // Layer 3: low body thump so the hit lands physically
+        const thump = this.ctx.createOscillator();
+        const thumpGain = this.ctx.createGain();
+        thump.type = 'sine';
+        thump.frequency.setValueAtTime(100, now);
+        thump.frequency.exponentialRampToValueAtTime(38, now + 0.2);
+        thumpGain.gain.setValueAtTime(0.6, now);
+        thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        thump.connect(thumpGain);
+        thumpGain.connect(this.sfxGain);
+        thump.start(now);
+        thump.stop(now + 0.2);
     }
 
     playEnemyLaser() {
