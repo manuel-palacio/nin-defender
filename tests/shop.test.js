@@ -87,6 +87,61 @@ describe('Shop consumables', () => {
     });
 });
 
+describe('Shop weapons', () => {
+    it('SPREAD GUN is a one-time 150-scrap purchase', () => {
+        const item = SHOP_ITEMS.find(i => i.id === 'weapon_spread');
+        const p = new Player(mockCanvas, {});
+        expect(item.kind).toBe('weapon');
+        expect(item.getCost(p)).toBe(150);
+        p.scrap = 149;
+        expect(item.canPurchase(p)).toBe(false);
+        p.scrap = 150;
+        expect(item.canPurchase(p)).toBe(true);
+        item.apply(p);
+        expect(p.ownedWeapons).toContain('SPREAD');
+        expect(item.canPurchase(p)).toBe(false); // already owned
+    });
+
+    it('RAILGUN purchase unlocks via tryPurchase and deducts scrap', () => {
+        const shop = new Shop();
+        const p = new Player(mockCanvas, {});
+        p.scrap = 300;
+        shop.selectedIndex = SHOP_ITEMS.findIndex(i => i.id === 'weapon_railgun');
+        expect(shop.tryPurchase(p)).toBe(true);
+        expect(p.scrap).toBe(50);
+        expect(p.ownedWeapons).toContain('RAILGUN');
+        expect(shop.tryPurchase(p)).toBe(false); // owned — no double buy
+    });
+});
+
+describe('Shop REPAIR HULL', () => {
+    it('costs 40 scrap per missing life', () => {
+        const repair = SHOP_ITEMS.find(i => i.id === 'repair_hull');
+        const p = new Player(mockCanvas, {});
+        p.applyUpgrades();
+        p.lives = p.maxLives - 3;
+        expect(repair.getCost(p)).toBe(120);
+    });
+
+    it('not purchasable at full hull', () => {
+        const repair = SHOP_ITEMS.find(i => i.id === 'repair_hull');
+        const p = new Player(mockCanvas, {});
+        p.applyUpgrades();
+        p.lives = p.maxLives;
+        p.scrap = 9999;
+        expect(repair.canPurchase(p)).toBe(false);
+    });
+
+    it('apply restores lives to max', () => {
+        const repair = SHOP_ITEMS.find(i => i.id === 'repair_hull');
+        const p = new Player(mockCanvas, {});
+        p.applyUpgrades();
+        p.lives = 1;
+        repair.apply(p);
+        expect(p.lives).toBe(p.maxLives);
+    });
+});
+
 describe('Shop cosmetics', () => {
     it('TRAIL COLOR is free and always purchasable', () => {
         const trail = SHOP_ITEMS.find(i => i.id === 'trail_color');

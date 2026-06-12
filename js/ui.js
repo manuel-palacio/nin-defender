@@ -8,6 +8,7 @@
 
 import { Utils } from './utils.js';
 import { PHASES } from './enemies.js';
+import { WEAPON_DEFS } from './weapons.js';
 
 export class UIRenderer {
     constructor(game) {
@@ -393,6 +394,10 @@ export class UIRenderer {
         const lockedSkins = g.player.skinNames.length - 1 - g.player.skinsUnlocked;
         const lockHint = lockedSkins > 0 ? ` (${lockedSkins} LOCKED)` : '';
         ctx.fillText(`Y: SKIN [${g.player.skinNames[g.player.skinIndex]}]${lockHint}`, w - 16, h - 36);
+        if (g.player.ownedWeapons.length > 1) {
+            ctx.fillStyle = WEAPON_DEFS[g.player.weapon].color;
+            ctx.fillText(`X: WEAPON [${g.player.weapon}]`, w - 16, h - 52);
+        }
 
         ctx.restore();
     }
@@ -475,6 +480,7 @@ export class UIRenderer {
             ['SPACE (hold)',  'Fire weapons'],
             ['E',             'Shield (3 charges)'],
             ['Q',             'Screen bomb'],
+            ['X',             'Switch weapon'],
             ['T',             'Cycle trail'],
             ['Y',             'Cycle ship skin'],
             ['P / ESC',       'Pause']

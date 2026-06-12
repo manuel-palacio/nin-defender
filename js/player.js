@@ -7,6 +7,7 @@ import { GAME_SCALE } from './constants.js';
 import { POWERUP_TYPES } from './powerups.js';
 import { Schemas } from './schemas.js';
 import { emitter } from './events.js';
+import { WEAPON_DEFS, WEAPON_ORDER } from './weapons.js';
 
 // Skin passives — keyed by Player.skinIndex (matches order of skinNames).
 // applyUpgrades() reads this AFTER computing base stats so the modifiers
@@ -117,6 +118,11 @@ export class Player {
         ];
         this.trailIndex = Schemas.loadTrail();
         this.trailColor = this.trailColors[this.trailIndex];
+
+        // Weapon arsenal — BLASTER is always owned; others are shop purchases.
+        this.ownedWeapons = ['BLASTER', ...Schemas.loadWeapons()];
+        const selected = Schemas.loadSelectedWeapon();
+        this.weapon = this.ownedWeapons.includes(selected) ? selected : 'BLASTER';
 
         // Ship skins — locked skins unlock by reaching phases (3/6/9)
         this.skinNames = ['CLASSIC', 'STEALTH', 'VIPER', 'TANK'];
@@ -331,6 +337,22 @@ export class Player {
         this.skinsUnlocked = index;
         localStorage.setItem('ninDefenderSkinsUnlocked', this.skinsUnlocked.toString());
         return true;
+    }
+
+    unlockWeapon(id) {
+        if (!WEAPON_DEFS[id] || this.ownedWeapons.includes(id)) return false;
+        this.ownedWeapons.push(id);
+        localStorage.setItem('ninDefenderWeapons',
+            JSON.stringify(this.ownedWeapons.filter(w => w !== 'BLASTER')));
+        return true;
+    }
+
+    cycleWeapon() {
+        const owned = WEAPON_ORDER.filter(id => this.ownedWeapons.includes(id));
+        const next = owned[(owned.indexOf(this.weapon) + 1) % owned.length];
+        this.weapon = next;
+        localStorage.setItem('ninDefenderWeapon', next);
+        return next;
     }
 
     _drawShipSkin(ctx, skin) {
@@ -663,16 +685,47 @@ export class Player {
     // — Player no longer reaches into particles/audio directly.
     shoot(projectilePool) {
         if (this.shootCooldown > 0 || !this.alive || this.laserBeam) return null;
-        this.shootCooldown = this.fireRate;
+        const def = WEAPON_DEFS[this.weapon] || WEAPON_DEFS.BLASTER;
+        this.shootCooldown = this.fireRate * def.fireRateMul;
 
-        const bulletSpeed = 700;
         const tipX = this.x + this.width / 2;
         const tipY = this.y;
+        // Bullets follow the smoothed visual tilt — same value the ship banks at.
+        const tilt = this.tilt;
+
+        // SPREAD and RAILGUN bypass the BLASTER's powerup synergies — their
+        // identity is the firing pattern, not the buff interactions.
+        if (this.weapon === 'SPREAD') {
+            const dmg = (this.baseDamage || 1) * def.dmgMul;
+            for (let i = 0; i < def.pellets; i++) {
+                const angle = tilt - def.arc / 2 + (def.arc * i) / (def.pellets - 1);
+                const pellet = projectilePool.get();
+                if (pellet) {
+                    pellet.init(tipX, tipY,
+                        def.speed * Math.cos(angle), def.speed * Math.sin(angle),
+                        def.color, def.color, false, dmg);
+                }
+            }
+            emitter.emit('shot:fired', { x: tipX + 5, y: tipY, color: def.color });
+            return { tripleShot: false, rapidFire: this.rapidFire };
+        }
+
+        if (this.weapon === 'RAILGUN') {
+            const bolt = projectilePool.get();
+            if (bolt) {
+                bolt.init(tipX, tipY,
+                    def.speed * Math.cos(tilt), def.speed * Math.sin(tilt),
+                    def.color, def.color, false, (this.baseDamage || 1) * def.dmgMul);
+                bolt.pierce = true;
+            }
+            emitter.emit('shot:fired', { x: tipX + 5, y: tipY, color: def.color });
+            return { tripleShot: false, rapidFire: this.rapidFire };
+        }
+
+        const bulletSpeed = 700;
 
         // Center shot
         const dmg = this.baseDamage || 1;
-        // Bullets follow the smoothed visual tilt — same value the ship banks at.
-        const tilt = this.tilt;
         const bvx = bulletSpeed * Math.cos(tilt);
         const bvy = bulletSpeed * Math.sin(tilt);
 

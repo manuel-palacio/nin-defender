@@ -115,3 +115,29 @@ describe('Schemas daily best', () => {
         expect(Schemas.loadDailyBest()).toBeNull();
     });
 });
+
+describe('Schemas weapon loaders', () => {
+    beforeEach(() => clearGameStorage());
+
+    it('loadWeapons defaults to empty list', () => {
+        expect(Schemas.loadWeapons()).toEqual([]);
+    });
+
+    it('loadWeapons round-trips valid purchases', () => {
+        localStorage.setItem('ninDefenderWeapons', JSON.stringify(['SPREAD', 'RAILGUN']));
+        expect(Schemas.loadWeapons()).toEqual(['SPREAD', 'RAILGUN']);
+    });
+
+    it('loadWeapons resets on unknown weapon ids', () => {
+        localStorage.setItem('ninDefenderWeapons', JSON.stringify(['SPREAD', 'BFG9000']));
+        expect(Schemas.loadWeapons()).toEqual([]);
+    });
+
+    it('loadSelectedWeapon defaults to BLASTER and rejects junk', () => {
+        expect(Schemas.loadSelectedWeapon()).toBe('BLASTER');
+        localStorage.setItem('ninDefenderWeapon', 'RAILGUN');
+        expect(Schemas.loadSelectedWeapon()).toBe('RAILGUN');
+        localStorage.setItem('ninDefenderWeapon', 'BANANA');
+        expect(Schemas.loadSelectedWeapon()).toBe('BLASTER');
+    });
+});

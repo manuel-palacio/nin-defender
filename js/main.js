@@ -232,6 +232,16 @@ import { Game, STATE } from './game.js';
                 game.onKeyUp('KeyQ');
             });
         }
+        const weaponBtn = document.getElementById('weaponBtn');
+        if (weaponBtn) {
+            weaponBtn.addEventListener('touchstart', e => {
+                e.preventDefault();
+                game.onKeyDown('KeyX');
+            });
+            weaponBtn.addEventListener('touchend', () => {
+                game.onKeyUp('KeyX');
+            });
+        }
 
         // Mute button
         const muteBtn = document.getElementById('muteBtn');

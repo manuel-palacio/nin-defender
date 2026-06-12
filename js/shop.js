@@ -3,8 +3,9 @@
 // ============================================================
 
 import { SKIN_PASSIVES } from './player.js';
+import { WEAPON_DEFS } from './weapons.js';
 
-// ShopItem is polymorphic on `kind`: 'upgrade' | 'consumable' | 'cosmetic'.
+// ShopItem is polymorphic on `kind`: 'upgrade' | 'consumable' | 'cosmetic' | 'weapon'.
 // Each kind owns its own getCost/getDescription/canPurchase/apply via injected
 // callbacks; the default behavior matches stat upgrades for backwards compat.
 export class ShopItem {
@@ -14,6 +15,7 @@ export class ShopItem {
         this.kind      = opts.kind || 'upgrade';
         this.baseCost  = opts.baseCost ?? 0;
         this.maxLevel  = opts.maxLevel ?? 0;
+        this.weaponId  = opts.weaponId || null;
         this._apply             = opts.apply             || (() => {});
         this._getDescription    = opts.getDescription;
         this._getCost           = opts.getCost;
@@ -109,6 +111,37 @@ export const SHOP_ITEMS = [
         canPurchase: (p) => p.shieldCharges < p.maxShieldCharges
                             && p.scrap >= (p.maxShieldCharges - p.shieldCharges) * 20,
         apply: (p) => { p.shieldCharges = p.maxShieldCharges; },
+    }),
+
+    new ShopItem({
+        id: 'repair_hull', name: 'REPAIR HULL', kind: 'consumable',
+        getCost: (p) => Math.max(1, p.maxLives - p.lives) * 40,
+        getDescription: (p) => `HULL: ${p.lives}/${p.maxLives}`,
+        canPurchase: (p) => p.lives < p.maxLives
+                            && p.scrap >= (p.maxLives - p.lives) * 40,
+        apply: (p) => { p.lives = p.maxLives; },
+    }),
+
+    // ----- Weapons — one-time purchases, switch in-run with X -----
+    new ShopItem({
+        id: 'weapon_spread', name: 'SPREAD GUN', kind: 'weapon', weaponId: 'SPREAD',
+        getCost: () => WEAPON_DEFS.SPREAD.cost,
+        getDescription: (p) => p.ownedWeapons.includes('SPREAD')
+            ? `${WEAPON_DEFS.SPREAD.desc} — OWNED`
+            : WEAPON_DEFS.SPREAD.desc,
+        canPurchase: (p) => !p.ownedWeapons.includes('SPREAD')
+                            && p.scrap >= WEAPON_DEFS.SPREAD.cost,
+        apply: (p) => { p.unlockWeapon('SPREAD'); },
+    }),
+    new ShopItem({
+        id: 'weapon_railgun', name: 'RAILGUN', kind: 'weapon', weaponId: 'RAILGUN',
+        getCost: () => WEAPON_DEFS.RAILGUN.cost,
+        getDescription: (p) => p.ownedWeapons.includes('RAILGUN')
+            ? `${WEAPON_DEFS.RAILGUN.desc} — OWNED`
+            : WEAPON_DEFS.RAILGUN.desc,
+        canPurchase: (p) => !p.ownedWeapons.includes('RAILGUN')
+                            && p.scrap >= WEAPON_DEFS.RAILGUN.cost,
+        apply: (p) => { p.unlockWeapon('RAILGUN'); },
     }),
 
     // ----- Cosmetics — free, cycles to next variant -----
@@ -261,6 +294,14 @@ export class Shop {
                 if (!purchasable && cost === 0) {
                     ctx.fillStyle = '#444';
                     ctx.fillText('FULL', startX + itemW, iy - itemH * 0.15);
+                } else {
+                    ctx.fillStyle = canAfford ? '#993300' : '#441111';
+                    ctx.fillText(`${cost} SCRAP`, startX + itemW, iy - itemH * 0.15);
+                }
+            } else if (item.kind === 'weapon') {
+                if (player.ownedWeapons.includes(item.weaponId)) {
+                    ctx.fillStyle = '#338833';
+                    ctx.fillText('OWNED', startX + itemW, iy - itemH * 0.15);
                 } else {
                     ctx.fillStyle = canAfford ? '#993300' : '#441111';
                     ctx.fillText(`${cost} SCRAP`, startX + itemW, iy - itemH * 0.15);

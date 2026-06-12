@@ -32,6 +32,8 @@ const TrailSchema      = z.coerce.number().int().min(0).default(0);
 const SkinSchema       = z.coerce.number().int().min(0).default(0);
 const SkinsUnlockedSchema = z.coerce.number().int().min(0).max(3).default(0);
 const DailyBestSchema  = z.object({ date: z.string(), score: z.number().int().min(0) });
+const WeaponIdSchema   = z.enum(['BLASTER', 'SPREAD', 'RAILGUN']);
+const WeaponsSchema    = z.array(z.enum(['SPREAD', 'RAILGUN'])).default([]);
 
 // safeLoad — JSON-parses the raw value when `json` is true, then runs it
 // through schema.safeParse(). On any failure (missing key, bad JSON, schema
@@ -66,6 +68,8 @@ export const Schemas = {
     loadSkin:        () => safeLoad('ninDefenderSkin', SkinSchema, 0, false),
     loadSkinsUnlocked: () => safeLoad('ninDefenderSkinsUnlocked', SkinsUnlockedSchema, 0, false),
     loadDailyBest:   () => safeLoad('ninDefenderDaily', DailyBestSchema, null, true),
+    loadWeapons:     () => safeLoad('ninDefenderWeapons', WeaponsSchema, [], true),
+    loadSelectedWeapon: () => safeLoad('ninDefenderWeapon', WeaponIdSchema, 'BLASTER', false),
     // Local-timezone YYYY-MM-DD — toISOString() would roll the day over at UTC
     // midnight, not the player's.
     localDateString: () => {
@@ -82,5 +86,5 @@ export const Schemas = {
     },
     UpgradesSchema, LeaderboardSchema, ScrapSchema,
     HighScoreSchema, DifficultySchema, TrailSchema, SkinSchema,
-    SkinsUnlockedSchema, DailyBestSchema,
+    SkinsUnlockedSchema, DailyBestSchema, WeaponsSchema, WeaponIdSchema,
 };

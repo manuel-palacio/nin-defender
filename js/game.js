@@ -612,6 +612,13 @@ export class Game {
             this.player.cycleSkin();
             this.keys['KeyY'] = false;
         }
+        if (this.keys['KeyX'] && this.state === STATE.PLAYING) {
+            if (this.player.ownedWeapons.length > 1) {
+                this.player.cycleWeapon();
+                this.audio.playPowerUp();
+            }
+            this.keys['KeyX'] = false;
+        }
 
         // Enemies — visual movement slows under Time Warp
         this.spawner.update(worldDt, this.score, this.canvas.width, this.canvas.height,
