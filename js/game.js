@@ -987,7 +987,7 @@ export class Game {
                     } else {
                         // Hit flash
                         this.particles.createExplosion(e.x, e.y, '#ffffff', 6, 120, 0.2, 2);
-                        this.audio.playSmallExplosion();
+                        this.audio.playImpact();
                     }
                     break;
                 }

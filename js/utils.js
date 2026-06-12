@@ -230,6 +230,53 @@ export class AudioManager {
         osc.stop(now + 0.15);
     }
 
+    // Non-lethal bullet impact — bright spark sizzle, NOT the low sine thump
+    // of playSmallExplosion (which read as a drum hit). Pitch is randomized
+    // per impact and retriggers are throttled because SPREAD can land five
+    // hits in a single frame.
+    playImpact() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        if (this._lastImpactAt && now - this._lastImpactAt < 0.03) return;
+        this._lastImpactAt = now;
+
+        // Layer 1: band-passed noise burst — the spark/sizzle of energy on hull
+        const len = 0.07;
+        const bufferSize = Math.floor(this.ctx.sampleRate * len);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+        }
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(2200 + Math.random() * 1200, now);
+        filter.Q.setValueAtTime(1.5, now);
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.35, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + len);
+        source.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.sfxGain);
+        source.start(now);
+
+        // Layer 2: quick descending blip — gives the zap a pitched "ping"
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        const start = 900 + Math.random() * 300;
+        osc.frequency.setValueAtTime(start, now);
+        osc.frequency.exponentialRampToValueAtTime(start * 0.3, now + 0.05);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    }
+
     playPowerUp() {
         if (!this.ctx || this.muted) return;
         const now = this.ctx.currentTime;
