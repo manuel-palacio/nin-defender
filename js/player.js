@@ -572,9 +572,11 @@ export class Player {
         const k = Math.min(1, 12 * dt);
         this.tilt += (targetTilt - this.tilt) * k;
 
-        // Clamp to screen
-        this.x = Utils.clamp(this.x, this.width / 2, this.canvas.width - this.width / 2);
-        this.y = Utils.clamp(this.y, this.height / 2, this.canvas.height - this.height / 2);
+        // Clamp to screen — the sprite is drawn as a (height * 2) square, so
+        // its half-extent is `height`, not width / 2.
+        const edge = this.height;
+        this.x = Utils.clamp(this.x, edge, this.canvas.width - edge);
+        this.y = Utils.clamp(this.y, edge, this.canvas.height - edge);
 
         // Shoot cooldown
         if (this.shootCooldown > 0) this.shootCooldown -= dt;

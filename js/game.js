@@ -16,6 +16,7 @@ import { UIRenderer } from './ui.js';
 import { Schemas } from './schemas.js';
 import { emitter } from './events.js';
 import { SONG_LYRICS } from './lyrics.js';
+import { ScorePopups } from './score-popups.js';
 
 export const STATE = {
     MENU:       'MENU',
@@ -25,6 +26,24 @@ export const STATE = {
     WAVE_CLEAR: 'WAVE_CLEAR',
     DYING:      'DYING',
     GAME_OVER:  'GAME_OVER'
+};
+
+const HIT_FLASH_DURATION = 0.08;
+const BOSS_HIT_STOP_COOLDOWN = 0.35;
+const BOSS_SHOVE_SPEED = 420;
+
+// Type-specific explosion effects
+const KILL_EFFECTS = {
+    ship:    { colors: ['#ff6644', '#ffaa33', '#ffee00', '#ffffff'], count: 30, shake: 6 }, // critter splat
+    bomber:  { colors: ['#cc44ff', '#aa66ee', '#8833cc', '#ffffff'], count: 40, shake: 8 }, // octopus ink burst
+    mine:    { colors: ['#ff66cc', '#ff88dd', '#ffaaee', '#ffffff'], count: 35, shake: 7 }, // jellyfish pop
+    drone:   { colors: ['#ddff00', '#ffee44', '#aadd00', '#ffffff'], count: 12, shake: 2 }, // firefly flash
+    stealth: { colors: ['#00cccc', '#00ffff', '#ffff00', '#ff00ff'], count: 22, shake: 4 }, // chameleon color burst
+    spider:  { colors: ['#66ff22', '#aaff44', '#44aa11', '#ffffff'], count: 28, shake: 5 },
+    ghost:   { colors: ['#bb66ff', '#dd99ff', '#8833cc', '#ffffff'], count: 25, shake: 4 },
+    devil:   { colors: ['#ff4400', '#ff8800', '#ffcc00', '#ff2200'], count: 35, shake: 7 },
+    boss:    { colors: ['#ffffff', '#ffdd00', '#ff8800', '#ff3366', '#00ffff'], count: 60, shake: 15 },
+    asteroid:{ colors: ['#ff9900', '#ffdd00', '#aa7733', '#ffffff'], count: 30, shake: 5 }
 };
 
 export class Game {
@@ -46,6 +65,7 @@ export class Game {
         this.background = new Background(canvas, this.assets);
         this.particles = new ParticlePool(1200);
         this.projectiles = new ProjectilePool(200);
+        this.scorePopups = new ScorePopups();
         this.anim = new Anim({ shake: this.shake, particles: this.particles, audio: this.audio });
         this.ui = new UIRenderer(this);
         this.spawner = new EnemySpawner(this.assets);
@@ -119,6 +139,9 @@ export class Game {
         // Hit-stop counter — frames remaining where world simulation is frozen
         // but anim ticks + render still fire. Decremented at the top of update().
         this._hitStopFrames = 0;
+        // Boss hits only freeze the frame every so often — with rapid fire,
+        // a hit-stop per bullet froze most of the fight.
+        this._bossHitStopCooldown = 0;
 
         // Pause menu
         this._pauseMenuIndex = 0;
@@ -149,7 +172,7 @@ export class Game {
             for (const e of this.spawner.enemies) {
                 if (!e.active) continue;
                 if (e.type === 'boss') {
-                    e.takeDamage(Math.ceil(e.maxHp * 0.25));
+                    if (e.takeDamage(Math.ceil(e.maxHp * 0.25))) this.killEnemy(e);
                     this.particles.createColorExplosion(e.x, e.y,
                         ['#ffffff', '#ffdd00'], 20, 200, 0.5, 4);
                 } else {
@@ -199,6 +222,7 @@ export class Game {
         this.anim.stopMenuLoops();
         this.anim.stopVignette();
         this._hitStopFrames = 0;
+        this._bossHitStopCooldown = 0;
         this.comboMilestoneFlash = null;
         this.skinUnlockFlash = null;
         this.state = STATE.PLAYING;
@@ -215,6 +239,7 @@ export class Game {
         this._bulletSpeedMul = diff.bulletSpeedMul;
         this.projectiles = new ProjectilePool(200);
         this.particles = new ParticlePool(1200);
+        this.scorePopups = new ScorePopups();
         this.anim.particles = this.particles; // keep cinematic FX bound to current pool
         this.powerups = [];
         // Randomize celestial body each new game
@@ -572,15 +597,8 @@ export class Game {
             for (const e of this.spawner.enemies) {
                 if (!e.active || e.x < beamX) continue;
                 if (Math.abs(e.y - beamY) > (e.radius || 0) + beamHalfWidth) continue;
-                const killed = e.takeDamage(dmgThisFrame);
-                if (killed) {
-                    e.active = false;
-                    const milestone = this.player.registerKill();
-                    if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
-                    this.score += Math.floor(e.points * this.player.getComboMultiplier());
-                    this.particles.createColorExplosion(e.x, e.y,
-                        ['#ff0066', '#ffffff', '#ff8800'], 20, 250, 0.6, 4);
-                }
+                e.hitFlash = HIT_FLASH_DURATION;
+                if (e.takeDamage(dmgThisFrame)) this.killEnemy(e);
             }
             this._laserBeam = { x1: beamX, y1: beamY, x2: this.canvas.width, y2: beamY };
             // Continuous low rumble while firing (per #61 AC mention)
@@ -620,7 +638,10 @@ export class Game {
             this.keys['KeyX'] = false;
         }
 
+        if (this._bossHitStopCooldown > 0) this._bossHitStopCooldown -= dt;
+
         // Enemies — visual movement slows under Time Warp
+        this.spawner.bossActive = this.bossActive;
         this.spawner.update(worldDt, this.score, this.canvas.width, this.canvas.height,
             this.projectiles, this.player.y, this.audio, this.player.x);
 
@@ -759,6 +780,7 @@ export class Game {
         // Projectiles + particles slow under Time Warp.
         this.projectiles.update(worldDt, this.canvas.width, this.canvas.height);
         this.particles.update(worldDt);
+        this.scorePopups.update(dt);
 
         // Power-ups — spawn timer stays on real dt so warp doesn't starve drops;
         // the dropped icon's drift slows visually with worldDt.
@@ -846,151 +868,19 @@ export class Game {
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const e = enemies[i];
                 if (!e.active) continue;
-                if (Utils.circleCollision(bullet.x, bullet.y, bullet.radius, e.x, e.y, e.radius)) {
-                    // Pierce bullets pass through but should hit each enemy ONCE,
-                    // not every frame they overlap (which was melting bosses in
-                    // a single bullet pass). Track the per-bullet hit-list.
-                    if (bullet.pierce) {
-                        if (!bullet.hitEnemies) bullet.hitEnemies = new Set();
-                        if (bullet.hitEnemies.has(e)) continue;
-                        bullet.hitEnemies.add(e);
-                    } else {
-                        bullet.active = false;
-                    }
-                    // Boss damage feels weighty: 3-frame hit-stop + theme-color flash.
-                    if (e.type === 'boss' && this._hitStopFrames === 0) {
-                        this._hitStopFrames = 3;
-                        this.anim.screenFlash({ color: e.color || '#ffffff', intensity: 0.3, duration: 0.08 });
-                    }
-                    const killed = e.takeDamage(bullet.damage);
-                    if (killed) {
-                        e.active = false;
-                        // Combo + score
-                        const milestone = this.player.registerKill();
-                        if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
-                        const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
-                        this.score += Math.floor(e.points * multiplier);
-                        // Scrap drops (1-3 per kill)
-                        this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
-                        this.scrapPulse = 1.0;
-
-                        // Asteroid spider burst — only after phase 4, 15% chance
-                        if (e.type === 'asteroid' && this.lastPhase >= 4 && Math.random() < 0.15) {
-                            const spiderCount = Utils.randomInt(2, 3);
-                            for (let s = 0; s < spiderCount; s++) {
-                                const spider = new SpiderDrone(this.canvas.width, this.canvas.height);
-                                spider.x = e.x;
-                                spider.y = e.y + Utils.random(-20, 20);
-                                spider.radius = 10; // smaller than normal
-                                spider.hp = 1;
-                                spider.maxHp = 1;
-                                spider.points = 15;
-                                spider.vx = Utils.random(-160, -80);
-                                spider.canvas_w = this.canvas.width;
-                                this.spawner.enemies.push(spider);
-                            }
-                        }
-
-                        // Asteroid splitting — asteroids break into smaller fragments
-                        if (e.type === 'asteroid') {
-                            // Only split if not already a tiny fragment
-                            if (e.radius > 8 * GAME_SCALE) {
-                                const fragCount = e.radius > 16 * GAME_SCALE ? Utils.randomInt(3, 5) : Utils.randomInt(2, 3);
-
-                                for (let f = 0; f < fragCount; f++) {
-                                    const angle = ((f + 0.5) / fragCount) * Math.PI * 2;
-                                    const fragR = e.radius * Utils.random(0.4, 0.6);
-                                    const frag = new Asteroid(
-                                        this.canvas.width, this.canvas.height,
-                                        1, // normal sizeMultiplier
-                                        e.x, e.y
-                                    );
-                                    // Override radius directly for precise control
-                                    frag.radius = Math.max(6, fragR);
-                                    frag.sizeMultiplier = 0.5;
-                                    frag.hp = 1;
-                                    frag.maxHp = 1;
-                                    frag.points = 5;
-                                    frag._spawnFrame = true;
-                                    // Push out from center immediately so fragments don't overlap kill point
-                                    const scatterDist = e.radius * 0.5;
-                                    frag.x = e.x + Math.cos(angle) * scatterDist;
-                                    frag.y = e.y + Math.sin(angle) * scatterDist;
-                                    frag.vx = Math.cos(angle) * Utils.random(80, 150) - 60;
-                                    frag.vy = Math.sin(angle) * Utils.random(60, 120);
-                                    frag.wavy = false;
-                                    frag.baseY = frag.y;
-                                    // Regenerate shape for new radius
-                                    frag.vertices = Utils.generateAsteroidShape(frag.radius, Utils.randomInt(5, 8));
-                                    this.spawner.enemies.push(frag);
-                                }
-                            }
-                        }
-
-                        // Type-specific explosion effects
-                        const explosionMap = {
-                            ship:    { colors: ['#ff6644', '#ffaa33', '#ffee00', '#ffffff'], count: 30, shake: 6 }, // critter splat
-                            bomber:  { colors: ['#cc44ff', '#aa66ee', '#8833cc', '#ffffff'], count: 40, shake: 8 }, // octopus ink burst
-                            mine:    { colors: ['#ff66cc', '#ff88dd', '#ffaaee', '#ffffff'], count: 35, shake: 7 }, // jellyfish pop
-                            drone:   { colors: ['#ddff00', '#ffee44', '#aadd00', '#ffffff'], count: 12, shake: 2 }, // firefly flash
-                            stealth: { colors: ['#00cccc', '#00ffff', '#ffff00', '#ff00ff'], count: 22, shake: 4 }, // chameleon color burst
-                            spider:  { colors: ['#66ff22', '#aaff44', '#44aa11', '#ffffff'], count: 28, shake: 5 },
-                            ghost:   { colors: ['#bb66ff', '#dd99ff', '#8833cc', '#ffffff'], count: 25, shake: 4 },
-                            devil:   { colors: ['#ff4400', '#ff8800', '#ffcc00', '#ff2200'], count: 35, shake: 7 },
-                            boss:    { colors: ['#ffffff', '#ffdd00', '#ff8800', '#ff3366', '#00ffff'], count: 60, shake: 15 },
-                            asteroid:{ colors: ['#ff9900', '#ffdd00', '#aa7733', '#ffffff'], count: 30, shake: 5 }
-                        };
-                        const fx = explosionMap[e.type] || explosionMap.asteroid;
-                        this.particles.createColorExplosion(e.x, e.y, fx.colors,
-                            fx.count, 300, 0.8, 5);
-                        this.particles.createShockwave(e.x, e.y, fx.colors[0]);
-                        this.shake.shake(fx.shake, 0.15);
-                        this.audio.playExplosion();
-
-                        // Boss kill — trigger cinematic, then wave-clear banner, then shop.
-                        if (e.type === 'boss') {
-                            const phase = this.lastPhase;
-                            // Wave-clear scrap bonus scales with the phase just beaten.
-                            const waveBonus = 20 * (phase + 1);
-                            this.player.addScrap(waveBonus);
-                            this.scrapPulse = 1.0;
-                            this.anim.bossKillCinematic(e.x, e.y, () => {
-                                this.state = STATE.WAVE_CLEAR;
-                                this.anim.waveClearBanner(phase, waveBonus, () => {
-                                    this.state = STATE.SHOP;
-                                    this.shop.selectedIndex = 0;
-                                });
-                            });
-                        }
-
-                        // Chain explosion — damage nearby enemies
-                        const chainRadius = 60 * GAME_SCALE;
-                        for (let j = enemies.length - 1; j >= 0; j--) {
-                            const other = enemies[j];
-                            if (!other.active || other === e || other._spawnFrame) continue;
-                            const dist = Utils.distance(e.x, e.y, other.x, other.y);
-                            if (dist < chainRadius + other.radius) {
-                                const chainKill = other.takeDamage(1);
-                                if (chainKill) {
-                                    other.active = false;
-                                    const chainMilestone = this.player.registerKill();
-                                    if (chainMilestone) this.awardComboMilestone(chainMilestone, other.x, other.y);
-                                    this.score += Math.floor(other.points * this.player.getComboMultiplier());
-                                    this.particles.createColorExplosion(other.x, other.y,
-                                        ['#ff6600', '#ffaa00', '#ffffff'], 20, 250, 0.6, 4);
-                                    this.audio.playSmallExplosion();
-                                } else {
-                                    this.particles.createExplosion(other.x, other.y, '#ffaa00', 8, 100, 0.3, 2);
-                                }
-                            }
-                        }
-                    } else {
-                        // Hit flash
-                        this.particles.createExplosion(e.x, e.y, '#ffffff', 6, 120, 0.2, 2);
-                        this.audio.playImpact();
-                    }
-                    break;
+                if (!Utils.circleCollision(bullet.x, bullet.y, bullet.radius, e.x, e.y, e.radius)) continue;
+                // Pierce bullets pass through but should hit each enemy ONCE,
+                // not every frame they overlap (which was melting bosses in
+                // a single bullet pass). Track the per-bullet hit-list.
+                if (bullet.pierce) {
+                    if (!bullet.hitEnemies) bullet.hitEnemies = new Set();
+                    if (bullet.hitEnemies.has(e)) continue;
+                    bullet.hitEnemies.add(e);
+                } else {
+                    bullet.active = false;
                 }
+                this.damageEnemy(e, bullet.damage);
+                break;
             }
         }
 
@@ -1008,10 +898,14 @@ export class Game {
                 const e = enemies[i];
                 if (!e.active) continue;
                 if (Utils.circleCollision(e.x, e.y, e.radius, px, py, pr)) {
-                    e.active = false;
-                    this.particles.createColorExplosion(e.x, e.y,
-                        ['#ff3366', '#ff9900', '#ffdd00'], 20, 200, 0.5, 3);
-                    this.audio.playExplosion();
+                    if (e.type === 'boss') {
+                        this.shovePlayerAwayFrom(e);
+                    } else {
+                        e.active = false;
+                        this.particles.createColorExplosion(e.x, e.y,
+                            ['#ff3366', '#ff9900', '#ffdd00'], 20, 200, 0.5, 3);
+                        this.audio.playExplosion();
+                    }
                     this.handlePlayerHit();
                 }
             }
@@ -1041,18 +935,151 @@ export class Game {
         }
     }
 
+    // Boss hits feel weighty: brief hit-stop + theme-color flash, rate-limited.
+    damageEnemy(e, damage) {
+        e.hitFlash = HIT_FLASH_DURATION;
+        if (e.type === 'boss' && this._bossHitStopCooldown <= 0) {
+            this._bossHitStopCooldown = BOSS_HIT_STOP_COOLDOWN;
+            this._hitStopFrames = 2;
+            this.anim.screenFlash({ color: e.color || '#ffffff', intensity: 0.3, duration: 0.08 });
+        }
+        if (e.takeDamage(damage)) {
+            this.killEnemy(e);
+        } else {
+            this.particles.createExplosion(e.x, e.y, '#ffffff', 6, 120, 0.2, 2);
+            this.audio.playImpact();
+        }
+    }
+
+    // Single exit for every enemy death — bullets, laser, chain reactions and
+    // bombs all land here so bosses always get their cinematic and the shop.
+    // Chain-reaction kills don't chain again, to avoid runaway cascades.
+    killEnemy(e, { chainReaction = true } = {}) {
+        e.active = false;
+        const milestone = this.player.registerKill();
+        if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
+        const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
+        const points = Math.floor(e.points * multiplier);
+        this.score += points;
+        this.scorePopups.add(e.x, e.y - e.radius, points, this.player.getComboMultiplier());
+        this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
+        this.scrapPulse = 1.0;
+
+        if (e.type === 'asteroid') this.spawnAsteroidDebris(e);
+        this.playKillEffects(e);
+        if (e.type === 'boss') this.onBossKilled();
+        if (chainReaction) this.triggerChainReaction(e);
+    }
+
+    spawnAsteroidDebris(asteroid) {
+        // Spider burst — only after phase 4, 15% chance
+        if (this.lastPhase >= 4 && Math.random() < 0.15) {
+            const spiderCount = Utils.randomInt(2, 3);
+            for (let s = 0; s < spiderCount; s++) {
+                const spider = new SpiderDrone(this.canvas.width, this.canvas.height);
+                spider.x = asteroid.x;
+                spider.y = asteroid.y + Utils.random(-20, 20);
+                spider.radius = 10; // smaller than normal
+                spider.hp = 1;
+                spider.maxHp = 1;
+                spider.points = 15;
+                spider.vx = Utils.random(-160, -80);
+                spider.canvas_w = this.canvas.width;
+                this.spawner.enemies.push(spider);
+            }
+        }
+
+        // Splitting — asteroids break into smaller fragments unless already tiny
+        if (asteroid.radius <= 8 * GAME_SCALE) return;
+        const fragCount = asteroid.radius > 16 * GAME_SCALE ? Utils.randomInt(3, 5) : Utils.randomInt(2, 3);
+        for (let f = 0; f < fragCount; f++) {
+            const angle = ((f + 0.5) / fragCount) * Math.PI * 2;
+            const fragR = asteroid.radius * Utils.random(0.4, 0.6);
+            const frag = new Asteroid(this.canvas.width, this.canvas.height, 1, asteroid.x, asteroid.y);
+            frag.radius = Math.max(6, fragR);
+            frag.sizeMultiplier = 0.5;
+            frag.hp = 1;
+            frag.maxHp = 1;
+            frag.points = 5;
+            frag._spawnFrame = true;
+            // Push out from center immediately so fragments don't overlap kill point
+            const scatterDist = asteroid.radius * 0.5;
+            frag.x = asteroid.x + Math.cos(angle) * scatterDist;
+            frag.y = asteroid.y + Math.sin(angle) * scatterDist;
+            frag.vx = Math.cos(angle) * Utils.random(80, 150) - 60;
+            frag.vy = Math.sin(angle) * Utils.random(60, 120);
+            frag.wavy = false;
+            frag.baseY = frag.y;
+            frag.vertices = Utils.generateAsteroidShape(frag.radius, Utils.randomInt(5, 8));
+            this.spawner.enemies.push(frag);
+        }
+    }
+
+    playKillEffects(e) {
+        const fx = KILL_EFFECTS[e.type] || KILL_EFFECTS.asteroid;
+        this.particles.createColorExplosion(e.x, e.y, fx.colors, fx.count, 300, 0.8, 5);
+        this.particles.createShockwave(e.x, e.y, fx.colors[0]);
+        this.shake.shake(fx.shake, 0.15);
+        this.audio.playExplosion();
+    }
+
+    // Boss kill — cinematic, then wave-clear banner, then shop.
+    onBossKilled() {
+        const phase = this.lastPhase;
+        const boss = this.spawner.enemies.find(e => e.type === 'boss');
+        const x = boss ? boss.x : this.canvas.width * 0.75;
+        const y = boss ? boss.y : this.canvas.height / 2;
+        // Wave-clear scrap bonus scales with the phase just beaten.
+        const waveBonus = 20 * (phase + 1);
+        this.player.addScrap(waveBonus);
+        this.scrapPulse = 1.0;
+        this.anim.bossKillCinematic(x, y, () => {
+            this.state = STATE.WAVE_CLEAR;
+            this.anim.waveClearBanner(phase, waveBonus, () => {
+                this.state = STATE.SHOP;
+                this.shop.selectedIndex = 0;
+            });
+        });
+    }
+
+    // Chain explosion — damage nearby enemies; lethal chain hits kill outright.
+    triggerChainReaction(source) {
+        const chainRadius = 60 * GAME_SCALE;
+        const enemies = this.spawner.enemies;
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            const other = enemies[j];
+            if (!other.active || other === source || other._spawnFrame) continue;
+            const dist = Utils.distance(source.x, source.y, other.x, other.y);
+            if (dist >= chainRadius + other.radius) continue;
+            other.hitFlash = HIT_FLASH_DURATION;
+            if (other.takeDamage(1)) {
+                this.killEnemy(other, { chainReaction: false });
+            } else {
+                this.particles.createExplosion(other.x, other.y, '#ffaa00', 8, 100, 0.3, 2);
+            }
+        }
+    }
+
+    // Bosses are solid: contact hurts the player and bounces them off the hull.
+    shovePlayerAwayFrom(boss) {
+        const dx = this.player.x - boss.x;
+        const dy = this.player.y - boss.y;
+        const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        this.player.vx = (dx / dist) * BOSS_SHOVE_SPEED - BOSS_SHOVE_SPEED * 0.5;
+        this.player.vy = (dy / dist) * BOSS_SHOVE_SPEED;
+        this.particles.createColorExplosion(this.player.x, this.player.y,
+            ['#ffffff', boss.color || '#ff3366'], 12, 180, 0.3, 3);
+    }
+
     handlePlayerHit() {
         // Nuke Overcharge intercept: the next damaging hit auto-detonates a bomb (or
         // absorbs harmlessly if no bombs left). Consumed on use either way.
         if (this.player.nukeOvercharge) {
             this.player.nukeOvercharge = false;
             this.player.nukeOverchargeTimer = 0;
-            if (this.player.bombs > 0) {
-                const kills = this.player.activateBomb(this.audio, this.particles, this.spawner.enemies);
-                if (kills > 0) this.score += kills * 5;
-                this.bombFlashTimer = 0.3;
-                this.shake.shake(15, 0.5);
-            } else {
+            // activateBomb emits 'bomb:requested', whose subscriber handles
+            // the kills, score, flash and shake.
+            if (!this.player.activateBomb()) {
                 // No bombs — absorb the hit with a small flash
                 this.particles.createColorExplosion(this.player.x, this.player.y,
                     ['#ff4400', '#ffaa00', '#ffffff'], 24, 220, 0.5, 4);
@@ -1149,6 +1176,7 @@ export class Game {
             this.projectiles.draw(ctx);
             // Particles on top
             this.particles.draw(ctx);
+            this.scorePopups.draw(ctx);
             // Bomb flash overlay
             if (this.bombFlashTimer > 0) {
                 ctx.fillStyle = `rgba(255, 255, 255, ${this.bombFlashTimer})`;

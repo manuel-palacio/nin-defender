@@ -65,3 +65,36 @@ describe('EnemySpawner.getSpawnInterval', () => {
         expect(spawner.getSpawnInterval(30)).toBe(0.45);
     });
 });
+
+describe('EnemySpawner.reset', () => {
+    it('clears the phase carried over from the previous run', () => {
+        const spawner = new EnemySpawner();
+        spawner.currentPhase = 6;
+        spawner.reset();
+        expect(spawner.currentPhase).toBe(0);
+    });
+});
+
+describe('EnemySpawner during a boss fight', () => {
+    const noPool = { get: () => null };
+    it('holds the current phase while bossActive even if score crosses a threshold', () => {
+        const spawner = new EnemySpawner();
+        spawner.timer = 100; // no spawns
+        spawner.update(0.016, 1500, 1280, 720, noPool, 360, null, 80);
+        expect(spawner.currentPhase).toBe(1);
+        spawner.bossActive = true;
+        spawner.update(0.016, 9999, 1280, 720, noPool, 360, null, 80);
+        expect(spawner.currentPhase).toBe(1);
+        spawner.bossActive = false;
+        spawner.update(0.016, 9999, 1280, 720, noPool, 360, null, 80);
+        expect(spawner.currentPhase).toBe(3);
+    });
+
+    it('spawns slower while a boss is alive', () => {
+        const spawner = new EnemySpawner();
+        spawner.baseInterval = 1.5;
+        const normal = spawner.getSpawnInterval(2);
+        spawner.bossActive = true;
+        expect(spawner.getSpawnInterval(2)).toBeGreaterThan(normal * 1.5);
+    });
+});

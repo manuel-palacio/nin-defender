@@ -12,6 +12,7 @@ export class Enemy {
         this.active = false;
         this.points = 10;
         this.type = 'asteroid';
+        this.hitFlash = 0; // seconds of white damage flash remaining
     }
 
     update(dt) {

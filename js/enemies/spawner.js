@@ -29,6 +29,8 @@ export const PHASES = [
     { name: 'TOTAL CHAOS',        threshold: 58000, featured: 'all',       color: '#ff3366' }
 ];
 
+const BOSS_SPAWN_THROTTLE = 2.0;
+
 export class EnemySpawner {
     constructor(assets) {
         this.assets = assets || {};
@@ -37,6 +39,10 @@ export class EnemySpawner {
         this.enemies = [];
         this.currentPhase = 0;
         this.phaseAnnouncedAt = -1; // score when last announcement was shown
+        // Set by Game each frame. While a boss lives, phase progression is
+        // frozen and mob spawns are throttled so the fight stays readable and
+        // a second boss can't be summoned mid-fight.
+        this.bossActive = false;
     }
 
     getPhase(score) {
@@ -49,15 +55,16 @@ export class EnemySpawner {
     // Smooth exponential spawn interval — no cliff between phases.
     // baseInterval comes from the difficulty setting (EASY/NORMAL/BRUTAL).
     getSpawnInterval(phase) {
-        return Math.max(0.45, this.baseInterval * Math.pow(0.82, phase));
+        const interval = Math.max(0.45, this.baseInterval * Math.pow(0.82, phase));
+        return this.bossActive ? interval * BOSS_SPAWN_THROTTLE : interval;
     }
 
     update(dt, score, canvasW, canvasH, projectilePool, playerY, audio, playerX) {
         this.timer -= dt;
         this._t = (this._t || 0) + dt;
 
-        // Phase check
-        const phase = this.getPhase(score);
+        // Phase check — held while a boss is alive
+        const phase = this.bossActive ? this.currentPhase : this.getPhase(score);
         if (phase !== this.currentPhase) {
             this.currentPhase = phase;
             this.phaseAnnouncedAt = score;
@@ -125,6 +132,7 @@ export class EnemySpawner {
                 default:
                     e.update(dt);
             }
+            if (e.hitFlash > 0) e.hitFlash -= dt;
             if (!e.active || e.isOffScreen(canvasW, canvasH)) {
                 this.enemies.splice(i, 1);
             }
@@ -305,7 +313,14 @@ export class EnemySpawner {
         for (const e of this.enemies) {
             if (!e.active) continue;
             if (e.elite) this._drawEliteAura(ctx, e);
-            e.draw(ctx);
+            if (e.hitFlash > 0) {
+                ctx.save();
+                ctx.filter = 'brightness(2.2) saturate(0.4)';
+                e.draw(ctx);
+                ctx.restore();
+            } else {
+                e.draw(ctx);
+            }
         }
     }
 
@@ -325,5 +340,8 @@ export class EnemySpawner {
     reset() {
         this.enemies = [];
         this.timer = 3; // grace period at start
+        this.currentPhase = 0;
+        this.phaseAnnouncedAt = -1;
+        this.bossActive = false;
     }
 }

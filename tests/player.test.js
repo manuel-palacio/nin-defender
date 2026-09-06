@@ -227,3 +227,14 @@ describe('Player.getActiveSynergy', () => {
         expect(p.getActiveSynergy()).toBe('CHAIN_REACTION');
     });
 });
+
+describe('Player screen clamp', () => {
+    it('keeps the drawn sprite fully on screen at the left edge', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.x = -100; p.y = -100;
+        p.update(0.016, {}, { active: false });
+        // Sprite is drawn as a (height*2) square, so half-extent is `height`.
+        expect(p.x).toBeGreaterThanOrEqual(p.height);
+        expect(p.y).toBeGreaterThanOrEqual(p.height);
+    });
+});

@@ -98,6 +98,7 @@ export class ProjectilePool {
         for (let i = 0; i < size; i++) {
             this.pool.push(new Projectile());
         }
+        this._rebuildCache();
     }
 
     get() {

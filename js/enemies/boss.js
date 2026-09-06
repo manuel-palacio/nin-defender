@@ -23,10 +23,10 @@ export class Boss extends Enemy {
         this.bossType = Utils.clamp(bossType, 0, 9);
         this.radius = (30 + this.bossType * 2) * GAME_SCALE;
 
-        // HP scales gently: easy bosses (8-18), medium (24-36), hard (44-60)
-        // Base HP scales with boss type; effective HP stays reasonable
-        // because it's measured in "seconds to kill" not raw HP
-        const hpTable = [10, 14, 18, 22, 28, 34, 40, 48, 56, 65];
+        // Tuned so an un-upgraded blaster (~5.5 dps) needs ~3s of hits on the
+        // first boss and ~20s on the last; a fully upgraded ship cuts that to
+        // a fifth. The old table (10-65) let tier 1 die before it even arrived.
+        const hpTable = [16, 22, 28, 36, 46, 56, 68, 80, 94, 110];
         this.hp = hpTable[this.bossType] || 10;
         this.maxHp = this.hp;
         this.points = 200 + this.bossType * 150;

@@ -94,9 +94,9 @@ export class UIRenderer {
             ctx.shadowBlur = 0;
         }
 
-        // Lives — top right (ship icons)
+        // Lives — top right, left of the mute button
         for (let i = 0; i < g.player.lives; i++) {
-            const lx = w - 30 - i * 30;
+            const lx = w - 120 - i * 30;
             const ly = 28;
             ctx.fillStyle = '#cc0000';
             ctx.shadowColor = '#cc0000';
@@ -110,8 +110,9 @@ export class UIRenderer {
             ctx.fill();
         }
 
-        // Active power-up indicators
-        let puY = 70;
+        // Active power-up indicators — start below the score/scrap/combo/
+        // milestone stack so timers never overprint the scrap counter.
+        let puY = 130;
         ctx.font = '12px Courier New';
         ctx.textAlign = 'left';
         ctx.shadowBlur = 0;
