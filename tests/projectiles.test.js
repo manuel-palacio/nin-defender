@@ -9,3 +9,15 @@ describe('ProjectilePool bullet caches', () => {
         expect(pool.getActive()).toEqual([]);
     });
 });
+
+describe('ProjectilePool owner stamping', () => {
+    it('stamps handed-out projectiles with the current owner', () => {
+        const pool = new ProjectilePool(4);
+        pool.currentOwner = 'spider';
+        const p = pool.get();
+        p.init(0, 0, 1, 0, '#fff', '#fff', true);
+        expect(p.owner).toBe('spider');
+        pool.currentOwner = 'player';
+        expect(pool.get().owner).toBe('player');
+    });
+});

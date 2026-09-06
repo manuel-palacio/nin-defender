@@ -4,7 +4,45 @@
 
 // GAME_SCALE + updateGameScale moved to constants.js — import from there.
 
+// mulberry32 — small seedable PRNG for daily runs. Every gameplay module
+// draws from Math.random, so seeding swaps that function; restoring puts the
+// native generator back.
+const nativeRandom = Math.random;
+function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+export function hashString(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+
 export const Utils = {
+    seedRandom(seed) {
+        Math.random = mulberry32(seed);
+    },
+
+    // For audio and other cosmetic randomness that must never consume the
+    // seeded gameplay sequence (SFX fire asynchronously and depend on mute).
+    unseededRandom() {
+        return nativeRandom();
+    },
+
+    restoreRandom() {
+        Math.random = nativeRandom;
+    },
+
     random(min, max) {
         return Math.random() * (max - min) + min;
     },
@@ -156,8 +194,103 @@ export class AudioManager {
         osc.stop(now + 0.08);
     }
 
-    playExplosion() {
-        this._explosion(1.0);
+    // `pitch` < 1 deepens the blast — big enemies thud, small ones pop.
+    playExplosion(pitch = 1.0) {
+        this._explosion(1.0, pitch);
+    }
+
+    // Rising blip per kill — pitch climbs with the combo so a streak is
+    // audible without looking at the HUD.
+    playComboTick(combo) {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        const step = Math.min(24, combo);
+        const freq = 440 * Math.pow(2, step / 12);
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.06);
+        gain.gain.setValueAtTime(0.10, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 0.09);
+    }
+
+    // Tiny glassy tick for a near-miss graze.
+    playGraze() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2400, now);
+        osc.frequency.exponentialRampToValueAtTime(3600, now + 0.04);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.sfxGain);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    }
+
+    // Boss entrance — long detuned saw swell with a sub drop underneath.
+    playBossRoar() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        const len = 1.6;
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.35, now + 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + len);
+        const lp = this.ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.setValueAtTime(300, now);
+        lp.frequency.exponentialRampToValueAtTime(1800, now + 0.5);
+        lp.frequency.exponentialRampToValueAtTime(120, now + len);
+        gain.connect(this.sfxGain);
+        lp.connect(gain);
+        for (const f of [55, 55.8, 82.4]) {
+            const osc = this.ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(f, now);
+            osc.frequency.exponentialRampToValueAtTime(f * 0.6, now + len);
+            osc.connect(lp);
+            osc.start(now);
+            osc.stop(now + len);
+        }
+        const sub = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(70, now);
+        sub.frequency.exponentialRampToValueAtTime(28, now + 1.0);
+        subGain.gain.setValueAtTime(0.7, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        sub.connect(subGain);
+        subGain.connect(this.sfxGain);
+        sub.start(now);
+        sub.stop(now + 1.0);
+    }
+
+    // Victory sting — rising major triad with a shimmer tail.
+    playVictory() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        [261.6, 329.6, 392.0, 523.3].forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now + i * 0.12);
+            gain.gain.setValueAtTime(0.001, now + i * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.18, now + i * 0.12 + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 1.4);
+            osc.connect(gain);
+            gain.connect(this.sfxGain);
+            osc.start(now + i * 0.12);
+            osc.stop(now + i * 0.12 + 1.4);
+        });
     }
 
     playSmallExplosion() {
@@ -181,10 +314,10 @@ export class AudioManager {
     // Shared explosion recipe. size 1.0 = full kill blast, smaller values
     // scale length, pitch, and loudness for chain kills / minor pops.
     // Each blast is pitch-randomized so back-to-back kills don't loop.
-    _explosion(size) {
+    _explosion(size, pitch = 1.0) {
         if (!this.ctx || this.muted) return;
         const now = this.ctx.currentTime;
-        const vary = 0.85 + Math.random() * 0.3;
+        const vary = (0.85 + Utils.unseededRandom() * 0.3) * pitch;
 
         // Layer 1: detonation crack — high-passed noise snap (the "bang")
         const crackLen = 0.03;
@@ -192,7 +325,7 @@ export class AudioManager {
         const crackBuf = this.ctx.createBuffer(1, crackSize, this.ctx.sampleRate);
         const crackData = crackBuf.getChannelData(0);
         for (let i = 0; i < crackSize; i++) {
-            crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
+            crackData[i] = (Utils.unseededRandom() * 2 - 1) * Math.pow(1 - i / crackSize, 4);
         }
         const crack = this.ctx.createBufferSource();
         crack.buffer = crackBuf;
@@ -229,7 +362,7 @@ export class AudioManager {
         for (let i = 0; i < bodySize; i++) {
             const t = i / bodySize;
             const env = t < 0.04 ? t / 0.04 : Math.pow(1 - t, 2);
-            bodyData[i] = (Math.random() * 2 - 1) * env;
+            bodyData[i] = (Utils.unseededRandom() * 2 - 1) * env;
         }
         const body = this.ctx.createBufferSource();
         body.buffer = bodyBuf;
@@ -266,13 +399,13 @@ export class AudioManager {
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+            data[i] = (Utils.unseededRandom() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
         }
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(2200 + Math.random() * 1200, now);
+        filter.frequency.setValueAtTime(2200 + Utils.unseededRandom() * 1200, now);
         filter.Q.setValueAtTime(1.5, now);
         const noiseGain = this.ctx.createGain();
         noiseGain.gain.setValueAtTime(0.35, now);
@@ -286,7 +419,7 @@ export class AudioManager {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        const start = 900 + Math.random() * 300;
+        const start = 900 + Utils.unseededRandom() * 300;
         osc.frequency.setValueAtTime(start, now);
         osc.frequency.exponentialRampToValueAtTime(start * 0.3, now + 0.05);
         gain.gain.setValueAtTime(0.12, now);
@@ -353,7 +486,7 @@ export class AudioManager {
         const buffer = this.ctx.createBuffer(1, size, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < size; i++) {
-            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / size, 1.2);
+            data[i] = (Utils.unseededRandom() * 2 - 1) * Math.pow(1 - i / size, 1.2);
         }
         const noise = this.ctx.createBufferSource();
         noise.buffer = buffer;
@@ -468,7 +601,7 @@ export class MusicManager {
         // Pick a random track, avoiding the one that just played
         let next;
         do {
-            next = Math.floor(Math.random() * this.tracks.length);
+            next = Math.floor(Utils.unseededRandom() * this.tracks.length);
         } while (next === this.trackIndex && this.tracks.length > 1);
         this.trackIndex = next;
         this.currentTrackName = this.tracks[next].replace('assets/', '').replace('.mp3', '');
@@ -500,10 +633,25 @@ export class MusicManager {
      */
     setIntensity(level) {
         this.intensity = Math.max(0, Math.min(1, level));
+        if (!this.playing || this._duckedUntil > this.ctx.currentTime) return;
+        this._rampTo(0.3 + this.intensity * 0.4, 0.3);
+    }
+
+    // Drops the music under a boss entrance, then swells back up.
+    duck(seconds = 2.5) {
         if (!this.playing) return;
-        const vol = 0.3 + this.intensity * 0.4;
+        this._duckedUntil = this.ctx.currentTime + seconds;
+        this._rampTo(0.12, 0.15);
         if (this.gainNode) {
-            this.gainNode.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 0.3);
+            this.gainNode.gain.linearRampToValueAtTime(0.3 + this.intensity * 0.4,
+                this._duckedUntil + 0.8);
+        }
+    }
+
+    _rampTo(vol, seconds) {
+        if (this.gainNode) {
+            this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
+            this.gainNode.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + seconds);
         } else {
             this.audio.volume = vol;
         }

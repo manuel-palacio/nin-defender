@@ -31,6 +31,12 @@ export const PHASES = [
 
 const BOSS_SPAWN_THROTTLE = 2.0;
 
+// Screen-area spawn cap — late phases were stacking 40+ enemies on a laptop
+// screen, which made bullets unreadable. Roughly 28 at 1280x800.
+export function maxEnemiesFor(canvasW, canvasH) {
+    return Math.round(Utils.clamp((canvasW * canvasH) / 36000, 12, 36));
+}
+
 export class EnemySpawner {
     constructor(assets) {
         this.assets = assets || {};
@@ -73,6 +79,9 @@ export class EnemySpawner {
         const phaseInfo = PHASES[this.currentPhase];
         const interval = this.getSpawnInterval(phase);
         const largeTier = phase >= 5 ? 0.2 : 0;
+
+        const crowded = this.enemies.length >= maxEnemiesFor(canvasW, canvasH);
+        if (this.timer <= 0 && crowded) this.timer = 0.25;
 
         if (this.timer <= 0) {
             this.timer = interval + Utils.random(-0.3, 0.3);
@@ -118,6 +127,7 @@ export class EnemySpawner {
         // Update all enemies
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
+            projectilePool.currentOwner = e.type;
             switch (e.type) {
                 case 'ship':
                 case 'bomber':

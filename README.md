@@ -15,6 +15,7 @@ A Nine Inch Nails-themed space shooter built with HTML5 Canvas and vanilla JavaS
 | T | Cycle trail color (11 colors) |
 | Y | Cycle ship skin (Classic, Stealth, Viper, Tank) |
 | Left/Right | Select difficulty on menu |
+| Up/Down | Toggle run mode on menu (Classic / Daily seeded run) |
 | P / Esc | Pause (with Resume/Restart/Main Menu) |
 
 Mobile: virtual joystick + fire/shield/bomb touch buttons (landscape only). PWA installable — add to home screen for fullscreen.
@@ -51,7 +52,12 @@ Each phase ends with a unique boss — all canvas-animated with distinct creatur
 | 7 | Chameleon Lord | Color-shifting body, curled tail, independent rotating slit eyes |
 | 8-10 | Demon Lords | Horns, fire aura, asymmetric glowing eyes, jagged mouth |
 
-Bosses have evasive AI — they dodge away from player fire and perform strafing maneuvers.
+Bosses have evasive AI — they dodge away from player fire and perform strafing maneuvers. Each tier also has one of three fight archetypes, announced on its intro panel:
+- **Charger** — telegraphs with a red shudder, then dashes across the screen. Contact hurts.
+- **Summoner** — shielded (30% damage) while its brood lives. Kill the minions first.
+- **Armored** — takes 20% damage until its core opens for a short window.
+
+Beating **TOTAL CHAOS** and pushing past 72,000 points summons the **Chaos Harbinger**, the run's final boss. Killing it shows the victory screen, records a ★ on the leaderboard, and unlocks endless mode for that run.
 
 ### Phase System
 10 progressive difficulty phases with smooth exponential spawn curve:
@@ -104,6 +110,11 @@ All purchases persist across games via localStorage.
 - Environmental hazards: solar flares, black holes (bend all bullets), asteroid belts
 
 ### Progression
+- **Scrap drops** — scrap lands where enemies die and drifts left; fly out to collect it (magnet range ~130px)
+- **Graze** — skim an enemy bullet without being hit to score and keep the combo alive
+- **Frontline bonus** — kills made in the right half of the screen score 1.5x
+- **Losing a life** clears the combo and every timed power-up, and the HUD names what hit you
+- **Daily run** — seeded by the date so everyone fights the same spawn sequence (D on the leaderboard)
 - **Combo system** — kill streaks multiply score (x2 through x5)
 - **Chain explosions** — kills damage nearby enemies within 60px
 - **Scrap collection** — earn scrap from kills, spend in upgrade shop
@@ -117,7 +128,7 @@ All purchases persist across games via localStorage.
 - 11 NIN MP3 tracks cycling randomly during gameplay
 - Menu/game-over music: "Me, I'm Not"
 - Song-specific lyrics displayed as animated comic-style words
-- Procedural SFX via Web Audio API (explosions, power-ups, hits)
+- Procedural SFX via Web Audio API (explosions pitched by enemy size, rising combo ticks, graze ticks, boss roar with music ducking, victory sting)
 - Dedicated SFX bus (quieter than music)
 
 ### Visuals
@@ -125,6 +136,8 @@ All purchases persist across games via localStorage.
 - Ship tilts when moving vertically, bullets follow tilt angle
 - Power-up hull glow cycles through active power-up colors
 - Life bar under player ship (green/orange/red)
+- Enemy bullets share one look (dark outline, magenta body, white core); planets dim during combat; on-screen enemy cap scales with screen area
+- Hit flash on damaged enemies, floating score popups
 - Animated lyrics: Impact font, per-word random colors, pop-in scale, slow fade
 - GAME_SCALE factor for mobile responsiveness
 - Auto cache-busting via build timestamp

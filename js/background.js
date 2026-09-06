@@ -1057,8 +1057,12 @@ export class Background {
             star.draw(ctx, this.time);
         }
 
-        // Celestial body (between distant and medium stars)
+        // Celestial body (between distant and medium stars) — dimmed during
+        // combat so enemy bullets stay readable against it.
+        ctx.save();
+        ctx.globalAlpha = 1 - (this.combatDim || 0);
         this.celestialBody.draw(ctx, this.time);
+        ctx.restore();
 
         // Medium stars
         for (const star of this.layers[1]) {

@@ -238,3 +238,32 @@ describe('Player screen clamp', () => {
         expect(p.y).toBeGreaterThanOrEqual(p.height);
     });
 });
+
+describe('Player graze and hit penalties', () => {
+    it('graze scores with the combo multiplier and refreshes the combo timer', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.combo = 6; p.comboTimer = 0.1;
+        expect(p.registerGraze()).toBe(45);
+        expect(p.comboTimer).toBe(p.comboDuration);
+        expect(p.grazes).toBe(1);
+    });
+
+    it('losing a life clears the combo and timed power-ups', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.combo = 12; p.comboTimer = 1;
+        p.applyPowerUp('RAPID_FIRE'); p.applyPowerUp('TRIPLE_SHOT');
+        const dead = p.hit();
+        expect(dead).toBe(false);
+        expect(p.combo).toBe(0);
+        expect(p.rapidFire).toBe(false);
+        expect(p.tripleShot).toBe(false);
+        expect(p.fireRate).toBe(p.baseFireRate);
+    });
+
+    it('a shield absorb does not strip buffs', () => {
+        const p = new Player(mockCanvas, noAssets);
+        p.applyPowerUp('RAPID_FIRE'); p.applyPowerUp('SHIELD');
+        p.hit();
+        expect(p.rapidFire).toBe(true);
+    });
+});

@@ -10,10 +10,11 @@ export class ScorePopups {
         this.pops = [];
     }
 
-    add(x, y, points, multiplier) {
+    add(x, y, points, multiplier, label = '') {
+        const base = multiplier > 1 ? `+${points} x${multiplier}` : `+${points}`;
         this.pops.push({
             x, y,
-            text: multiplier > 1 ? `+${points} x${multiplier}` : `+${points}`,
+            text: label ? `${label} ${base}` : base,
             color: multiplier >= 4 ? '#ff2200' : multiplier >= 2 ? '#ffaa00' : '#ffffff',
             size: multiplier >= 4 ? 18 : 14,
             life: POP_LIFE,

@@ -23,6 +23,7 @@ export class Projectile {
         this.pierce = false;
         this.splitOnBounce = false;
         this.hitEnemies = null; // pierce-bullet hit-list, init on demand
+        this.owner = null;      // enemy type (or 'player') that fired it
     }
 
     init(x, y, vx, vy, color, glowColor, isEnemy, damage = 1) {
@@ -40,6 +41,7 @@ export class Projectile {
         this.pierce = false;
         this.splitOnBounce = false;
         this.hitEnemies = null;
+        this.grazed = false;
     }
 
     update(dt, canvasW, canvasH) {
@@ -68,9 +70,21 @@ export class Projectile {
         ctx.shadowBlur = 12;
 
         if (this.isEnemy) {
-            // Enemy bullets — small circles
+            // Enemy bullets share one unmistakable look regardless of who
+            // fired them: dark outline, hot magenta body, white core.
+            ctx.shadowColor = '#ff2266';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fill();
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff2266';
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius * 0.45, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
             ctx.fill();
         } else {
             // Player bullets — elongated ellipse
@@ -101,11 +115,17 @@ export class ProjectilePool {
         this._rebuildCache();
     }
 
+    // Whoever is about to fire sets currentOwner first; every projectile
+    // handed out is stamped with it so hits can be attributed.
     get() {
+        const p = this._firstInactive();
+        if (p) p.owner = this.currentOwner || null;
+        return p;
+    }
+
+    _firstInactive() {
         for (let i = 0; i < this.pool.length; i++) {
-            if (!this.pool[i].active) {
-                return this.pool[i];
-            }
+            if (!this.pool[i].active) return this.pool[i];
         }
         if (this.pool.length < this.maxSize * 2) {
             const p = new Projectile();

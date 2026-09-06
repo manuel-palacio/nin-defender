@@ -134,6 +134,7 @@ export class Player {
         this.comboTimer = 0;
         this.comboDuration = 2.0; // seconds before combo resets
         this.maxCombo = 0;
+        this.grazes = 0;
     }
 
     reset(canvas) {
@@ -175,6 +176,7 @@ export class Player {
         this.combo = 0;
         this.comboTimer = 0;
         this.maxCombo = 0;
+        this.grazes = 0;
         this.applyUpgrades();
     }
 
@@ -481,6 +483,29 @@ export class Player {
         return null;
     }
 
+    // A near-miss keeps the combo alive and is worth a few points — dodging
+    // through bullets scores, so hiding at the edge costs you.
+    registerGraze() {
+        this.grazes++;
+        if (this.combo > 0) this.comboTimer = this.comboDuration;
+        return 15 * this.getComboMultiplier();
+    }
+
+    // Losing a life is a real setback: the streak and every timed buff end.
+    stripBuffsOnHit() {
+        this.combo = 0;
+        this.comboTimer = 0;
+        this.rapidFire = false; this.rapidFireTimer = 0; this.fireRate = this.baseFireRate;
+        this.tripleShot = false; this.tripleShotTimer = 0;
+        this.ricochet = false; this.ricochetTimer = 0;
+        this.timeWarp = false; this.timeWarpTimer = 0;
+        this.laserBeam = false; this.laserBeamTimer = 0;
+        if (this.wingman) {
+            emitter.emit('wingman:expired', { x: this.wingmanX, y: this.wingmanY });
+            this.wingman = false; this.wingmanTimer = 0;
+        }
+    }
+
     getComboMultiplier() {
         if (this.combo < 3) return 1;
         if (this.combo < 6) return 2;
@@ -521,6 +546,7 @@ export class Player {
             return false; // shield absorbed
         }
         this.lives--;
+        this.stripBuffsOnHit();
         if (this.lives <= 0) {
             this.alive = false;
             return true; // dead

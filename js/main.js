@@ -188,6 +188,9 @@ import { Game, STATE } from './game.js';
                 game.audio.init();
                 game.audio.resume();
                 game.startGame();
+            } else if (game.state === STATE.VICTORY) {
+                e.preventDefault();
+                game.onKeyDown('Space');
             } else if (game.state === STATE.SHOP) {
                 e.preventDefault();
                 const touch = e.changedTouches[0];

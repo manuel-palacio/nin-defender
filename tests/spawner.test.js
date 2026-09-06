@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EnemySpawner, PHASES } from '../js/enemies/spawner.js';
+import { EnemySpawner, PHASES, maxEnemiesFor } from '../js/enemies/spawner.js';
 
 beforeEach(() => clearGameStorage());
 
@@ -96,5 +96,21 @@ describe('EnemySpawner during a boss fight', () => {
         const normal = spawner.getSpawnInterval(2);
         spawner.bossActive = true;
         expect(spawner.getSpawnInterval(2)).toBeGreaterThan(normal * 1.5);
+    });
+});
+
+describe('maxEnemiesFor', () => {
+    it('scales with screen area within sane bounds', () => {
+        expect(maxEnemiesFor(1280, 800)).toBe(28);
+        expect(maxEnemiesFor(640, 360)).toBe(12);
+        expect(maxEnemiesFor(3840, 2160)).toBe(36);
+    });
+
+    it('skips spawning when the field is at the cap', () => {
+        const spawner = new EnemySpawner();
+        spawner.timer = 0;
+        for (let i = 0; i < 28; i++) spawner.enemies.push({ active: true, type: 'asteroid', update() {}, isOffScreen: () => false });
+        spawner.update(0.016, 0, 1280, 800, { get: () => null }, 360, null, 80);
+        expect(spawner.enemies).toHaveLength(28);
     });
 });

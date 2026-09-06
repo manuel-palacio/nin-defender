@@ -2,7 +2,7 @@
 // game.js — Game state machine, update loop, collision, HUD
 // ============================================================
 
-import { Utils, AudioManager, MusicManager, ScreenShake } from './utils.js';
+import { Utils, AudioManager, MusicManager, ScreenShake, hashString } from './utils.js';
 import { GAME_SCALE } from './constants.js';
 import { Background, SolarFlare, BlackHole, AsteroidBelt } from './background.js';
 import { ParticlePool } from './particles.js';
@@ -17,6 +17,7 @@ import { Schemas } from './schemas.js';
 import { emitter } from './events.js';
 import { SONG_LYRICS } from './lyrics.js';
 import { ScorePopups } from './score-popups.js';
+import { ScrapField } from './scrap.js';
 
 export const STATE = {
     MENU:       'MENU',
@@ -25,12 +26,26 @@ export const STATE = {
     SHOP:       'SHOP',
     WAVE_CLEAR: 'WAVE_CLEAR',
     DYING:      'DYING',
+    VICTORY:    'VICTORY',
     GAME_OVER:  'GAME_OVER'
 };
 
 const HIT_FLASH_DURATION = 0.08;
 const BOSS_HIT_STOP_COOLDOWN = 0.35;
 const BOSS_SHOVE_SPEED = 420;
+const GRAZE_MARGIN = 16;
+const FRONTLINE_BONUS = 1.5;     // kills made in the right half of the screen
+const COMBAT_BACKGROUND_DIM = 0.4;
+const FINAL_BOSS_TYPE = 9;
+// Phase transitions spawn boss tiers 1-9; the Chaos Harbinger (tier 10) is
+// the run's ending and arrives once the player pushes past TOTAL CHAOS.
+const FINAL_BOSS_SCORE = 72000;
+
+const ENEMY_NAMES = {
+    asteroid: 'ASTEROID', ship: 'CRITTER', drone: 'FIREFLY', mine: 'JELLYFISH',
+    spider: 'SPIDER', ghost: 'GHOST', bomber: 'OCTOPUS', stealth: 'CHAMELEON',
+    devil: 'DEVIL', boss: 'BOSS',
+};
 
 // Type-specific explosion effects
 const KILL_EFFECTS = {
@@ -66,6 +81,7 @@ export class Game {
         this.particles = new ParticlePool(1200);
         this.projectiles = new ProjectilePool(200);
         this.scorePopups = new ScorePopups();
+        this.scrapField = new ScrapField();
         this.anim = new Anim({ shake: this.shake, particles: this.particles, audio: this.audio });
         this.ui = new UIRenderer(this);
         this.spawner = new EnemySpawner(this.assets);
@@ -146,6 +162,13 @@ export class Game {
         // Pause menu
         this._pauseMenuIndex = 0;
 
+        // Run mode — DAILY seeds the RNG from today's date so everyone
+        // fights the same spawn sequence.
+        this.runMode = Schemas.loadRunMode();
+        this.victoryAchieved = false;
+        // What last damaged the player: { name, x, y } — shown on hit and death.
+        this.lastHit = null;
+
         // Difficulty
         this.difficulties = ['EASY', 'NORMAL', 'BRUTAL'];
         this.difficultyIndex = Schemas.loadDifficulty();
@@ -216,6 +239,9 @@ export class Game {
 
     // ----- State transitions -----
     startGame() {
+        // Seed first: everything below draws from the RNG.
+        if (this.runMode === 'DAILY') Utils.seedRandom(hashString(Schemas.localDateString()));
+        else Utils.restoreRandom();
         this.audio.init();
         this.audio.resume();
         this.anim.killAll();
@@ -240,6 +266,10 @@ export class Game {
         this.projectiles = new ProjectilePool(200);
         this.particles = new ParticlePool(1200);
         this.scorePopups = new ScorePopups();
+        this.scrapField = new ScrapField();
+        this.victoryAchieved = false;
+        this._finalBossSpawned = false;
+        this.lastHit = null;
         this.anim.particles = this.particles; // keep cinematic FX bound to current pool
         this.powerups = [];
         // Randomize celestial body each new game
@@ -284,6 +314,7 @@ export class Game {
         this.anim.killAll();
         this.anim.stopVignette();
         this.state = STATE.GAME_OVER;
+        Utils.restoreRandom();
         // Capture PB delta BEFORE mutating highScore so the reveal animation
         // can show "+N above your best" with the correct old-best comparison.
         const prevBest = this.highScore;
@@ -313,7 +344,9 @@ export class Game {
             phase: this.lastPhase + 1,
             time: Math.floor(this.time),
             maxCombo: this.player.maxCombo,
-            date: new Date().toLocaleDateString()
+            date: new Date().toLocaleDateString(),
+            won: this.victoryAchieved,
+            daily: this.runMode === 'DAILY',
         });
         this.leaderboard.sort((a, b) => b.score - a.score);
         this.leaderboard = this.leaderboard.slice(0, 10);
@@ -376,6 +409,7 @@ export class Game {
                     this.anim.killAll();
                     this.anim.startMenuLoops();
                     this.state = STATE.MENU;
+                    Utils.restoreRandom();
                     if (this.music) this.music.stop();
                     this.menuMusic.currentTime = 0;
                     this.menuMusic.play().catch(() => {});
@@ -396,6 +430,16 @@ export class Game {
                 localStorage.setItem('ninDefenderDifficulty', this.difficultyIndex.toString());
                 this.anim.popDifficulty();
             }
+            if (code === 'ArrowUp' || code === 'ArrowDown' || code === 'KeyW' || code === 'KeyS') {
+                this.runMode = this.runMode === 'DAILY' ? 'CLASSIC' : 'DAILY';
+                localStorage.setItem('ninDefenderRunMode', this.runMode);
+            }
+        }
+
+        if (this.state === STATE.VICTORY && (code === 'Space' || code === 'Enter')) {
+            this.state = STATE.SHOP;
+            this.shop.selectedIndex = 0;
+            return;
         }
 
         // Start menu music on any key if we're on the menu
@@ -475,13 +519,16 @@ export class Game {
         }
 
         if (this.state === STATE.MENU) {
+            this.background.combatDim = 0;
             this.background.update(dt);
             return;
         }
 
         if (this.state === STATE.PAUSED) return;
 
-        if (this.state === STATE.SHOP) {
+        this.background.combatDim = this.state === STATE.PLAYING ? COMBAT_BACKGROUND_DIM : 0;
+
+        if (this.state === STATE.SHOP || this.state === STATE.VICTORY) {
             this.shop.update(dt);
             this.background.update(dt);
             return;
@@ -547,6 +594,7 @@ export class Game {
         this.player.drawTrail(this.particles);
 
         // Auto-fire if key held or touch — apply micro shake + recoil per shot.
+        this.projectiles.currentOwner = 'player';
         if ((this.keys['Space'] || this.touchFiring) && this.state === STATE.PLAYING) {
             const shot = this.player.shoot(this.projectiles);
             if (shot && !this.player.invincible) {
@@ -644,6 +692,7 @@ export class Game {
         this.spawner.bossActive = this.bossActive;
         this.spawner.update(worldDt, this.score, this.canvas.width, this.canvas.height,
             this.projectiles, this.player.y, this.audio, this.player.x);
+        this.fulfillSummons();
 
         // Phase announcement + boss spawning
         const currentPhase = this.spawner.currentPhase;
@@ -686,20 +735,13 @@ export class Game {
             // Spawn boss at each phase transition (except phase 0)
             if (currentPhase > 0 && this.bossSpawnedForPhase < currentPhase) {
                 this.bossSpawnedForPhase = currentPhase;
-                const boss = new Boss(this.canvas.width, this.canvas.height, currentPhase - 1, this.assets);
-                boss.canvas_w = this.canvas.width;
-                this.spawner.enemies.push(boss);
-                this.bossActive = true;
-                // Set up the boss preview panel — runs for ~2s, fades over the last 0.4s.
-                this._bossPreview = {
-                    timer: 2.0,
-                    duration: 2.0,
-                    name: BOSS_NAMES[boss.bossType] || `BOSS T${boss.bossType + 1}`,
-                    tier: boss.bossType + 1,
-                    maxHp: boss.maxHp,
-                    color: boss.color,
-                };
+                this.spawnBoss(currentPhase - 1, `TIER ${currentPhase}`);
             }
+        }
+        if (!this.bossActive && !this.victoryAchieved && !this._finalBossSpawned &&
+            this.score >= FINAL_BOSS_SCORE) {
+            this.spawnBoss(FINAL_BOSS_TYPE, 'FINAL BOSS');
+            this._finalBossSpawned = true;
         }
         // Check if boss is still alive
         if (this.bossActive) {
@@ -762,7 +804,7 @@ export class Game {
         if (this.solarFlare.active && !this.solarFlare.warning) {
             const hitbox = this.solarFlare.getHitbox();
             if (hitbox && Math.abs(this.player.x - hitbox.x) < hitbox.width / 2 + this.player.radius) {
-                this.handlePlayerHit();
+                this.handlePlayerHit({ name: 'SOLAR FLARE', x: hitbox.x, y: this.player.y });
             }
         }
 
@@ -781,6 +823,11 @@ export class Game {
         this.projectiles.update(worldDt, this.canvas.width, this.canvas.height);
         this.particles.update(worldDt);
         this.scorePopups.update(dt);
+        const collected = this.scrapField.update(worldDt, this.player);
+        if (collected > 0) {
+            this.player.addScrap(collected);
+            this.scrapPulse = 1.0;
+        }
 
         // Power-ups — spawn timer stays on real dt so warp doesn't starve drops;
         // the dropped icon's drift slows visually with worldDt.
@@ -889,7 +936,12 @@ export class Game {
             for (const bullet of enemyBullets) {
                 if (Utils.circleCollision(bullet.x, bullet.y, bullet.radius, px, py, pr)) {
                     bullet.active = false;
-                    this.handlePlayerHit();
+                    const shooter = ENEMY_NAMES[bullet.owner] || 'ENEMY';
+                    this.handlePlayerHit({ name: `${shooter} FIRE`, x: bullet.x, y: bullet.y });
+                } else if (!bullet.grazed && !this.player.invincible &&
+                           Utils.circleCollision(bullet.x, bullet.y, bullet.radius, px, py, pr + GRAZE_MARGIN)) {
+                    bullet.grazed = true;
+                    this.registerGraze(bullet);
                 }
             }
 
@@ -906,7 +958,8 @@ export class Game {
                             ['#ff3366', '#ff9900', '#ffdd00'], 20, 200, 0.5, 3);
                         this.audio.playExplosion();
                     }
-                    this.handlePlayerHit();
+                    const name = e.type === 'boss' ? BOSS_NAMES[e.bossType] : ENEMY_NAMES[e.type] || 'ENEMY';
+                    this.handlePlayerHit({ name, x: e.x, y: e.y });
                 }
             }
 
@@ -935,6 +988,25 @@ export class Game {
         }
     }
 
+    spawnBoss(bossType, tierLabel) {
+        const boss = new Boss(this.canvas.width, this.canvas.height, bossType, this.assets);
+        boss.canvas_w = this.canvas.width;
+        this.spawner.enemies.push(boss);
+        this.bossActive = true;
+        this.audio.playBossRoar();
+        if (this.music) this.music.duck(3.0);
+        // Preview panel — runs for ~3s, fades over the last 0.4s.
+        this._bossPreview = {
+            timer: 3.0,
+            duration: 3.0,
+            name: BOSS_NAMES[boss.bossType] || `BOSS T${boss.bossType + 1}`,
+            tier: tierLabel,
+            maxHp: boss.maxHp,
+            color: boss.color,
+            hint: boss.behaviorHint,
+        };
+    }
+
     // Boss hits feel weighty: brief hit-stop + theme-color flash, rate-limited.
     damageEnemy(e, damage) {
         e.hitFlash = HIT_FLASH_DURATION;
@@ -958,12 +1030,15 @@ export class Game {
         e.active = false;
         const milestone = this.player.registerKill();
         if (milestone) this.awardComboMilestone(milestone, e.x, e.y);
-        const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier();
+        const frontline = this.player.x > this.canvas.width / 2;
+        const multiplier = this.player.getComboMultiplier() * this.player.getPowerComboMultiplier()
+                         * (frontline ? FRONTLINE_BONUS : 1);
         const points = Math.floor(e.points * multiplier);
         this.score += points;
-        this.scorePopups.add(e.x, e.y - e.radius, points, this.player.getComboMultiplier());
-        this.player.addScrap(Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
-        this.scrapPulse = 1.0;
+        this.scorePopups.add(e.x, e.y - e.radius, points, this.player.getComboMultiplier(),
+            frontline ? 'FRONTLINE' : '');
+        this.scrapField.spawn(e.x, e.y, Utils.randomInt(1, e.type === 'boss' ? 30 : 3));
+        this.audio.playComboTick(this.player.combo);
 
         if (e.type === 'asteroid') this.spawnAsteroidDebris(e);
         this.playKillEffects(e);
@@ -1020,7 +1095,38 @@ export class Game {
         this.particles.createColorExplosion(e.x, e.y, fx.colors, fx.count, 300, 0.8, 5);
         this.particles.createShockwave(e.x, e.y, fx.colors[0]);
         this.shake.shake(fx.shake, 0.15);
-        this.audio.playExplosion();
+        // Bigger enemies thud lower: radius 12 → ~1.2x pitch, boss 48 → ~0.5x.
+        this.audio.playExplosion(Utils.clamp(18 / (e.radius || 15), 0.45, 1.3));
+    }
+
+    registerGraze(bullet) {
+        const points = this.player.registerGraze();
+        this.score += points;
+        this.scorePopups.add(bullet.x, bullet.y - 10, points, 1, 'GRAZE');
+        this.particles.createExplosion(bullet.x, bullet.y, '#ffffff', 5, 90, 0.2, 1.5);
+        this.audio.playGraze();
+    }
+
+    // Summoner bosses ask for brood; spawn it beside them and track it so the
+    // boss knows when its shield is down.
+    fulfillSummons() {
+        for (const boss of this.spawner.enemies) {
+            if (boss.type !== 'boss' || !boss.summonRequest) continue;
+            const type = boss.summonRequest;
+            boss.summonRequest = null;
+            const before = this.spawner.enemies.length;
+            for (let i = 0; i < 3; i++) this.spawner.spawnByType(type, this.canvas.width, this.canvas.height, 0);
+            const brood = this.spawner.enemies.slice(before);
+            brood.forEach((minion, i) => {
+                minion.x = boss.x - boss.radius - 20;
+                minion.y = boss.y + (i - (brood.length - 1) / 2) * 60;
+                if (minion.baseY !== undefined) minion.baseY = minion.y;
+                minion.hitFlash = HIT_FLASH_DURATION;
+                this.particles.createColorExplosion(minion.x, minion.y, ['#88ddff', '#ffffff'], 10, 120, 0.4, 3);
+            });
+            boss.minions.push(...brood);
+            this.audio.playPowerUp();
+        }
     }
 
     // Boss kill — cinematic, then wave-clear banner, then shop.
@@ -1033,13 +1139,30 @@ export class Game {
         const waveBonus = 20 * (phase + 1);
         this.player.addScrap(waveBonus);
         this.scrapPulse = 1.0;
+        const finalBoss = boss && boss.bossType === FINAL_BOSS_TYPE && !this.victoryAchieved;
         this.anim.bossKillCinematic(x, y, () => {
+            if (finalBoss) return this.triggerVictory();
             this.state = STATE.WAVE_CLEAR;
             this.anim.waveClearBanner(phase, waveBonus, () => {
                 this.state = STATE.SHOP;
                 this.shop.selectedIndex = 0;
             });
         });
+    }
+
+    // The run has an ending: beating the Chaos Harbinger shows the victory
+    // screen and records the win. Endless mode continues from the shop.
+    triggerVictory() {
+        this.victoryAchieved = true;
+        this.state = STATE.VICTORY;
+        this.audio.playVictory();
+        if (this.music) this.music.duck(4.0);
+        for (const e of this.spawner.enemies) if (e.type !== 'boss') e.active = false;
+        for (const b of this.projectiles.getEnemyBullets()) b.active = false;
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('ninDefenderHigh', this.highScore.toString());
+        }
     }
 
     // Chain explosion — damage nearby enemies; lethal chain hits kill outright.
@@ -1071,7 +1194,8 @@ export class Game {
             ['#ffffff', boss.color || '#ff3366'], 12, 180, 0.3, 3);
     }
 
-    handlePlayerHit() {
+    handlePlayerHit(source = { name: 'ENEMY', x: this.player.x, y: this.player.y }) {
+        this.lastHit = source;
         // Nuke Overcharge intercept: the next damaging hit auto-detonates a bomb (or
         // absorbs harmlessly if no bombs left). Consumed on use either way.
         if (this.player.nukeOvercharge) {
@@ -1113,11 +1237,14 @@ export class Game {
             // Cut music for dramatic silence
             if (this.music) this.music.stop();
         } else {
-            // Survive — moderate hit-stop + red flash.
+            // Survive — moderate hit-stop + red flash + who did it.
             this._hitStopFrames = 4;
             this.anim.screenFlash({ color: '#ff0000', intensity: 0.5, duration: 0.12 });
             this.shake.shake(8, 0.2);
             this.audio.playHit();
+            if (this.player.invincible && this.player.invincibleTimer >= 3.0) {
+                this.comboMilestoneFlash = { text: `HIT BY ${source.name} — COMBO & BUFFS LOST`, timer: 2.5 };
+            }
         }
     }
 
@@ -1136,11 +1263,12 @@ export class Game {
         // Background
         this.background.draw(ctx);
 
-        if (this.state === STATE.PLAYING || this.state === STATE.PAUSED || this.state === STATE.WAVE_CLEAR || this.state === STATE.DYING) {
+        if (this.state === STATE.PLAYING || this.state === STATE.PAUSED || this.state === STATE.WAVE_CLEAR || this.state === STATE.DYING || this.state === STATE.VICTORY) {
             // Environmental hazards (behind gameplay)
             this.asteroidBelt.draw(ctx);
             this.blackHole.draw(ctx);
-            // Power-ups
+            // Scrap drops + power-ups
+            this.scrapField.draw(ctx);
             for (const pu of this.powerups) pu.draw(ctx);
             // Enemies
             this.spawner.draw(ctx);
@@ -1195,6 +1323,7 @@ export class Game {
             const progress = 1 - Math.max(0, this._dyingTimer / 1.5);
             ctx.fillStyle = `rgba(180, 0, 0, ${progress * 0.6})`;
             ctx.fillRect(-50, -50, this.canvas.width + 100, this.canvas.height + 100);
+            if (this.lastHit) this.ui.drawKillerCallout(ctx, this.lastHit);
         }
 
         ctx.restore();
@@ -1208,6 +1337,7 @@ export class Game {
         if (this.state === STATE.PAUSED)      this.ui.drawPause(ctx);
         if (this.state === STATE.SHOP)        this.shop.draw(ctx, this.canvas, this.player);
         if (this.state === STATE.WAVE_CLEAR)  this.ui.drawWaveClear(ctx);
+        if (this.state === STATE.VICTORY)     this.ui.drawVictory(ctx);
         if (this.state === STATE.GAME_OVER)   this.ui.drawGameOver(ctx);
 
         // Screen flash overlay — driven by anim.screenFlash() (hit-stop, etc).

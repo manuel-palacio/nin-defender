@@ -9,6 +9,7 @@
 import { Utils } from './utils.js';
 import { PHASES } from './enemies.js';
 import { WEAPON_DEFS } from './weapons.js';
+import { Schemas } from './schemas.js';
 
 export class UIRenderer {
     constructor(game) {
@@ -108,6 +109,16 @@ export class UIRenderer {
             ctx.lineTo(lx - 5, ly + 7);
             ctx.closePath();
             ctx.fill();
+        }
+
+        // Graze count — under the lives, right aligned
+        if (g.player.grazes > 0) {
+            ctx.font = 'bold 13px Courier New';
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#dddddd';
+            ctx.shadowBlur = 0;
+            ctx.fillText(`GRAZE ${g.player.grazes}`, w - 16, 60);
+            ctx.textAlign = 'left';
         }
 
         // Active power-up indicators — start below the score/scrap/combo/
@@ -222,7 +233,7 @@ export class UIRenderer {
             ctx.shadowBlur = 6;
             ctx.font = `bold 13px Courier New`;
             ctx.fillStyle = '#cccccc';
-            ctx.fillText(`INCOMING — TIER ${bp.tier}`, w / 2, panelY + 20);
+            ctx.fillText(`INCOMING — ${bp.tier}`, w / 2, panelY + 20);
 
             // Boss name
             ctx.font = `bold 22px Courier New`;
@@ -245,6 +256,11 @@ export class UIRenderer {
             ctx.font = '11px Courier New';
             ctx.fillStyle = '#888';
             ctx.fillText(`${bp.maxHp} HP`, w / 2, barY + 22);
+            if (bp.hint) {
+                ctx.font = 'bold 12px Courier New';
+                ctx.fillStyle = '#ffdd88';
+                ctx.fillText(bp.hint, w / 2, panelY + panelH + 18);
+            }
 
             ctx.restore();
         }
@@ -281,6 +297,13 @@ export class UIRenderer {
             const timeStr = mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
             ctx.fillText(`PHASE ${g.lastPhase + 1}: ${PHASES[g.lastPhase].name}  [${timeStr}]`, w / 2, 20);
             ctx.shadowBlur = 0;
+            if (g.runMode === 'DAILY' || g.victoryAchieved) {
+                ctx.font = 'bold 11px Courier New';
+                ctx.fillStyle = g.victoryAchieved ? '#ffdd00' : '#88ddff';
+                const tag = [g.runMode === 'DAILY' ? 'DAILY RUN' : '', g.victoryAchieved ? 'ENDLESS' : '']
+                    .filter(Boolean).join(' • ');
+                ctx.fillText(tag, w / 2, 36);
+            }
         }
 
         // NIN quote — words flash one at a time at random positions
@@ -463,17 +486,28 @@ export class UIRenderer {
         ctx.fillText(g.difficulties[g.difficultyIndex], w / 2, diffY + 20);
         ctx.globalAlpha = 1;
 
+        // Run mode — W/S toggles CLASSIC / DAILY (seeded by today's date)
+        ctx.font = 'bold 14px Courier New';
+        ctx.fillStyle = '#555';
+        ctx.fillText('^ MODE v', w / 2, diffY + 46);
+        ctx.font = 'bold 16px Courier New';
+        ctx.fillStyle = g.runMode === 'DAILY' ? '#88ddff' : '#aaaaaa';
+        const modeLabel = g.runMode === 'DAILY'
+            ? `DAILY RUN  ${Schemas.localDateString()}`
+            : 'CLASSIC';
+        ctx.fillText(modeLabel, w / 2, diffY + 66);
+
         // Mobile hint
         if ('ontouchstart' in window) {
             ctx.font = `${Math.min(w * 0.02, 13)}px Courier New`;
             ctx.fillStyle = '#444';
-            ctx.fillText('TAP ANYWHERE TO START', w / 2, h * 0.57);
+            ctx.fillText('TAP ANYWHERE TO START', w / 2, diffY + 84);
         }
 
         // Controls
         ctx.font = 'bold 13px Courier New';
         ctx.fillStyle = '#777';
-        const cy = h * 0.62;
+        const cy = h * 0.68;
         ctx.fillText('— CONTROLS —', w / 2, cy);
         ctx.font = '12px Courier New';
         const controls = [
@@ -484,6 +518,7 @@ export class UIRenderer {
             ['X',             'Switch weapon'],
             ['T',             'Cycle trail'],
             ['Y',             'Cycle ship skin'],
+            ['W / S',         'Run mode (classic / daily)'],
             ['P / ESC',       'Pause']
         ];
         controls.forEach(([key, desc], i) => {
@@ -536,6 +571,87 @@ export class UIRenderer {
             ctx.fillText(`+${wb.scrapBonus} SCRAP BONUS`, w / 2, h * 0.4 + 55);
         }
 
+        ctx.restore();
+    }
+
+    // ----- Death attribution ----- ring + label on whatever landed the kill
+    drawKillerCallout(ctx, hit) {
+        const g = this.game;
+        const pulse = 0.6 + 0.4 * Math.sin(g.menuTime * 10);
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.arc(hit.x, hit.y, 34, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = 'bold 15px Courier New';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000';
+        ctx.shadowBlur = 0;
+        const labelY = hit.y < 70 ? hit.y + 56 : hit.y - 44;
+        const label = `KILLED BY ${hit.name}`;
+        const halfW = ctx.measureText(label).width / 2 + 8;
+        const labelX = Utils.clamp(hit.x, halfW, g.canvas.width - halfW);
+        ctx.strokeText(label, labelX, labelY);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, labelX, labelY);
+        ctx.restore();
+    }
+
+    // ----- Victory ----- the run's ending; endless mode continues after
+    drawVictory(ctx) {
+        const g = this.game;
+        const w = g.canvas.width;
+        const h = g.canvas.height;
+        ctx.save();
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.82)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(this._getScanLines(w, h), 0, 0);
+        ctx.textAlign = 'center';
+
+        const glow = 18 + 10 * Math.sin(g.menuTime * 3);
+        ctx.font = `bold ${Math.min(w * 0.055, 44)}px Courier New`;
+        ctx.fillStyle = '#ffdd00';
+        ctx.shadowColor = '#ffdd00';
+        ctx.shadowBlur = glow;
+        ctx.fillText('NOTHING CAN STOP ME NOW', w / 2, h * 0.3);
+
+        ctx.shadowBlur = 0;
+        ctx.font = '15px Courier New';
+        ctx.fillStyle = '#cc0000';
+        ctx.fillText('THE CHAOS HARBINGER IS DEAD', w / 2, h * 0.3 + 34);
+
+        const runSecs = Math.floor(g.time);
+        const runClock = `${Math.floor(runSecs / 60)}:${(runSecs % 60).toString().padStart(2, '0')}`;
+        const lines = [
+            ['SCORE', g.score.toLocaleString()],
+            ['TIME', runClock],
+            ['MAX COMBO', `x${g.player.maxCombo}`],
+            ['GRAZES', `${g.player.grazes}`],
+            ['LIVES LEFT', `${g.player.lives}`],
+        ];
+        ctx.font = '16px Courier New';
+        lines.forEach(([label, value], i) => {
+            const y = h * 0.46 + i * 26;
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#777';
+            ctx.fillText(label, w / 2 - 12, y);
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#d4d4d4';
+            ctx.fillText(value, w / 2 + 12, y);
+        });
+
+        ctx.textAlign = 'center';
+        const pulse = 0.4 + 0.6 * Math.sin(g.menuTime * 2.5);
+        ctx.globalAlpha = pulse;
+        ctx.font = 'bold 16px Courier New';
+        ctx.fillStyle = '#ffdd00';
+        ctx.fillText('[ SPACE ]  CONTINUE INTO ENDLESS MODE', w / 2, h * 0.82);
         ctx.restore();
     }
 
@@ -669,7 +785,8 @@ export class UIRenderer {
                 const phase = entry.phase ? `P${entry.phase}` : '';
                 const combo = entry.maxCombo ? `x${entry.maxCombo}` : '';
                 const time = entry.time ? `${Math.floor(entry.time / 60)}:${(entry.time % 60).toString().padStart(2, '0')}` : '';
-                ctx.fillText(`${i + 1}. ${entry.score}  ${phase}  ${time}  ${combo}`, w / 2, h * 0.73 + 16 + i * 14);
+                const flags = `${entry.won ? '★' : ''}${entry.daily ? 'D' : ''}`;
+                ctx.fillText(`${i + 1}. ${entry.score}  ${phase}  ${time}  ${combo}  ${flags}`, w / 2, h * 0.73 + 16 + i * 14);
             }
         }
 

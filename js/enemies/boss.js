@@ -15,6 +15,27 @@ export const BOSS_NAMES = [
     'CHAOS HARBINGER',
 ];
 
+// Three fight archetypes cycle through the tiers so consecutive bosses never
+// play the same. Each one has a tell and a counter the player can learn.
+export const BOSS_BEHAVIORS = {
+    CHARGER:   { hint: 'CHARGES ACROSS THE SCREEN — STAY OFF ITS LINE' },
+    SUMMONER:  { hint: 'SHIELDED BY ITS BROOD — KILL THE MINIONS FIRST' },
+    WEAKPOINT: { hint: 'ARMORED — STRIKE WHEN THE CORE OPENS' },
+};
+const BEHAVIOR_BY_TYPE = ['CHARGER', 'SUMMONER', 'WEAKPOINT', 'CHARGER', 'SUMMONER',
+                          'WEAKPOINT', 'CHARGER', 'SUMMONER', 'WEAKPOINT', 'WEAKPOINT'];
+const MINION_BY_TYPE = ['asteroid', 'ship', 'drone', 'mine', 'spider', 'ghost',
+                        'bomber', 'stealth', 'devil', 'devil'];
+
+const CHARGE_INTERVAL = 6.0;
+const CHARGE_WINDUP = 0.9;
+const CHARGE_SPEED = 900;
+const CHARGE_RETURN_SPEED = 260;
+const SUMMON_INTERVAL = 7.0;
+const SUMMON_SHIELD_DAMAGE_MUL = 0.3;
+const CORE_CLOSED_DAMAGE_MUL = 0.2;
+const CORE_OPEN_DURATION = 2.2;
+
 export class Boss extends Enemy {
     constructor(canvasW, canvasH, bossType = 0, assets = {}) {
         super();
@@ -81,7 +102,39 @@ export class Boss extends Enemy {
         ];
         this.color = this.themeColors[this.bossType] || '#ffffff';
 
+        // Behaviour state
+        this.behavior = BEHAVIOR_BY_TYPE[this.bossType];
+        this.behaviorHint = BOSS_BEHAVIORS[this.behavior].hint;
+        this.chargeTimer = CHARGE_INTERVAL * 0.6;
+        this.chargeState = 'idle'; // idle | windup | dash | return
+        this.summonTimer = SUMMON_INTERVAL * 0.4;
+        this.summonRequest = null;  // minion type for Game to spawn this frame
+        this.minions = [];
+        this.coreOpen = false;
+        this.coreTimer = 0;
+
         this.active = true;
+    }
+
+    // Armor: summoners are shielded while any brood lives; weak-point bosses
+    // only take real damage while the core is open.
+    takeDamage(amount) {
+        return super.takeDamage(amount * this.damageMultiplier());
+    }
+
+    damageMultiplier() {
+        if (this.behavior === 'SUMMONER' && this.hasLivingMinions()) return SUMMON_SHIELD_DAMAGE_MUL;
+        if (this.behavior === 'WEAKPOINT' && !this.coreOpen) return CORE_CLOSED_DAMAGE_MUL;
+        return 1;
+    }
+
+    hasLivingMinions() {
+        this.minions = this.minions.filter(m => m.active);
+        return this.minions.length > 0;
+    }
+
+    isCharging() {
+        return this.chargeState === 'dash';
     }
 
     update(dt, playerY, projectilePool, audio) {
@@ -130,8 +183,10 @@ export class Boss extends Enemy {
             this.y = Utils.clamp(this.y, topEdge, botEdge);
         }
 
-        // Cycle attack patterns once arrived
-        if (this.arrived) {
+        if (this.arrived) this._updateBehavior(dt);
+
+        // Cycle attack patterns once arrived (charging bosses hold fire mid-dash)
+        if (this.arrived && !this.isCharging()) {
             this.patternTimer += dt;
             if (this.patternTimer >= this.patternInterval) {
                 this.patternTimer = 0;
@@ -160,6 +215,52 @@ export class Boss extends Enemy {
 
         // Advance spiral angle over time for rotation effect
         this.spiralAngle += dt * 2;
+    }
+
+    _updateBehavior(dt) {
+        switch (this.behavior) {
+            case 'CHARGER':   this._updateCharge(dt); break;
+            case 'SUMMONER':  this._updateSummon(dt); break;
+            case 'WEAKPOINT': this._updateCore(dt);   break;
+        }
+    }
+
+    _updateCharge(dt) {
+        this.chargeTimer -= dt;
+        switch (this.chargeState) {
+            case 'idle':
+                if (this.chargeTimer <= 0) { this.chargeState = 'windup'; this.chargeTimer = CHARGE_WINDUP; }
+                break;
+            case 'windup':
+                this.x += Math.sin(this.time * 60) * 2; // shudder tell
+                if (this.chargeTimer <= 0) this.chargeState = 'dash';
+                break;
+            case 'dash':
+                this.x -= CHARGE_SPEED * dt;
+                if (this.x <= this.radius + 20) this.chargeState = 'return';
+                break;
+            case 'return':
+                this.x += CHARGE_RETURN_SPEED * dt;
+                if (this.x >= this.stopX) { this.x = this.stopX; this.chargeState = 'idle'; this.chargeTimer = CHARGE_INTERVAL; }
+                break;
+        }
+    }
+
+    _updateSummon(dt) {
+        this.summonTimer -= dt;
+        if (this.summonTimer <= 0 && !this.hasLivingMinions()) {
+            this.summonTimer = SUMMON_INTERVAL;
+            this.summonRequest = MINION_BY_TYPE[this.bossType];
+        }
+    }
+
+    _updateCore(dt) {
+        this.coreTimer -= dt;
+        if (this.coreTimer > 0) return;
+        this.coreOpen = !this.coreOpen;
+        // Late tiers keep the core open for less time and cycle faster.
+        const speed = 1 - Math.min(0.4, this.bossType * 0.05);
+        this.coreTimer = this.coreOpen ? CORE_OPEN_DURATION * speed : this.patternInterval * 1.5 * speed;
     }
 
     fireAimed(playerY, projectilePool, audio) {
@@ -256,7 +357,50 @@ export class Boss extends Enemy {
         const method = drawMethods[this.bossType] || (this.bossType >= 7 ? '_drawDevilBoss' : '_drawDefaultBoss');
         this[method](ctx, r, t, color, pulse);
 
+        this._drawBehaviorOverlay(ctx, r, t);
         this._drawBossHealthBar(ctx, r);
+        ctx.restore();
+    }
+
+    _drawBehaviorOverlay(ctx, r, t) {
+        ctx.save();
+        ctx.lineWidth = 3;
+        if (this.behavior === 'CHARGER' && this.chargeState === 'windup') {
+            const flash = 0.5 + 0.5 * Math.sin(t * 40);
+            ctx.strokeStyle = `rgba(255, 40, 40, ${flash})`;
+            ctx.shadowColor = '#ff2222';
+            ctx.shadowBlur = 25;
+            ctx.beginPath(); ctx.arc(0, 0, r + 12, 0, Math.PI * 2); ctx.stroke();
+        } else if (this.behavior === 'CHARGER' && this.chargeState === 'dash') {
+            ctx.fillStyle = 'rgba(255, 80, 40, 0.25)';
+            ctx.beginPath();
+            ctx.moveTo(-r, -r * 0.6); ctx.lineTo(r * 3, 0); ctx.lineTo(-r, r * 0.6);
+            ctx.closePath(); ctx.fill();
+        } else if (this.behavior === 'SUMMONER' && this.hasLivingMinions()) {
+            const pulse = 0.6 + 0.4 * Math.sin(t * 6);
+            ctx.strokeStyle = `rgba(120, 220, 255, ${pulse})`;
+            ctx.shadowColor = '#88ddff';
+            ctx.shadowBlur = 18;
+            ctx.setLineDash([10, 8]);
+            ctx.lineDashOffset = -t * 40;
+            ctx.beginPath(); ctx.arc(0, 0, r + 10, 0, Math.PI * 2); ctx.stroke();
+        } else if (this.behavior === 'WEAKPOINT') {
+            const coreR = r * 0.28;
+            if (this.coreOpen) {
+                const pulse = 0.7 + 0.3 * Math.sin(t * 12);
+                ctx.fillStyle = `rgba(255, 255, 255, ${pulse})`;
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 30 * pulse;
+                ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = `rgba(255, 220, 0, ${pulse})`;
+                ctx.beginPath(); ctx.arc(0, 0, coreR + 8 + 4 * Math.sin(t * 8), 0, Math.PI * 2); ctx.stroke();
+            } else {
+                ctx.fillStyle = 'rgba(20, 20, 30, 0.9)';
+                ctx.strokeStyle = 'rgba(150, 150, 170, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            }
+        }
         ctx.restore();
     }
 
