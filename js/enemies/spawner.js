@@ -323,15 +323,25 @@ export class EnemySpawner {
         for (const e of this.enemies) {
             if (!e.active) continue;
             if (e.elite) this._drawEliteAura(ctx, e);
-            if (e.hitFlash > 0) {
-                ctx.save();
-                ctx.filter = 'brightness(2.2) saturate(0.4)';
-                e.draw(ctx);
-                ctx.restore();
-            } else {
-                e.draw(ctx);
-            }
+            e.draw(ctx);
+            if (e.hitFlash > 0) this._drawHitFlash(ctx, e);
         }
+    }
+
+    // One additive glow over the enemy. Not ctx.filter: a filter re-rasterizes
+    // every fill/stroke of the enemy through an offscreen layer, and bosses
+    // under sustained fire flash almost every frame (measured 121 → 37fps).
+    _drawHitFlash(ctx, e) {
+        const r = (e.radius || 12) * 1.25;
+        const glow = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+        glow.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+        glow.addColorStop(0.7, 'rgba(255, 255, 255, 0.12)');
+        glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = glow;
+        ctx.fillRect(e.x - r, e.y - r, r * 2, r * 2);
+        ctx.restore();
     }
 
     _drawEliteAura(ctx, e) {

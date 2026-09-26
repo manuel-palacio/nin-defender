@@ -114,3 +114,25 @@ describe('maxEnemiesFor', () => {
         expect(spawner.enemies).toHaveLength(28);
     });
 });
+
+describe('hit flash rendering', () => {
+    function recordingContext() {
+        const filterWrites = [];
+        const ctx = {
+            save() {}, restore() {}, fillRect() {},
+            createRadialGradient: () => ({ addColorStop() {} }),
+            set filter(value) { filterWrites.push(value); },
+        };
+        return { ctx, filterWrites };
+    }
+
+    it('draws a flashing enemy once and never uses ctx.filter (per-draw filters tank boss fps)', () => {
+        const spawner = new EnemySpawner();
+        let draws = 0;
+        spawner.enemies = [{ active: true, hitFlash: 0.05, x: 10, y: 10, radius: 40, draw: () => { draws++; } }];
+        const { ctx, filterWrites } = recordingContext();
+        spawner.draw(ctx);
+        expect(draws).toBe(1);
+        expect(filterWrites).toEqual([]);
+    });
+});

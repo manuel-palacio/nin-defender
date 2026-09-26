@@ -5,6 +5,7 @@
 import { AssetLoader, ASSET_MANIFEST } from './utils.js';
 import { updateGameScale } from './constants.js';
 import { Game, STATE } from './game.js';
+import { PostFX } from './postfx.js';
 
 (function () {
     'use strict';
@@ -90,12 +91,15 @@ import { Game, STATE } from './game.js';
         // Debug/automation handle — Playwright & Puppeteer verification drives
         // runs through this (see CLAUDE memory: browser verification is mandatory).
         window.game = game;
+        const postfx = new PostFX(canvas);
+        window.postfx = postfx;
 
         // ---- Keyboard input ----
         window.addEventListener('keydown', e => {
             if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 e.preventDefault();
             }
+            if (e.code === 'KeyG') postfx.toggle();
             game.onKeyDown(e.code);
         });
         window.addEventListener('keyup', e => {
@@ -279,6 +283,11 @@ import { Game, STATE } from './game.js';
 
             game.update(dt);
             game.render();
+            postfx.render({ time: timestamp / 1000, shakeMagnitude: currentShake(game.shake) });
+        }
+
+        function currentShake(shake) {
+            return shake.timer > 0 ? shake.intensity * (shake.timer / shake.duration) : 0;
         }
 
         requestAnimationFrame(ts => {

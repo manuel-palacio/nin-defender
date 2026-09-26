@@ -14,7 +14,7 @@ export function updateGameScale(canvasWidth) {
 // shadowBlur is one of the most expensive Canvas 2D ops on mobile GPUs.
 // On low-end devices we clamp it globally by intercepting the prototype
 // setter — every `ctx.shadowBlur = N` write goes through this and gets
-// capped to MAX_SHADOW_BLUR. Original setter is preserved in a closure.
+// capped to the current cap. Original setter is preserved in a closure.
 const isTouchDevice = typeof window !== 'undefined' &&
     (('ontouchstart' in window) || (navigator.maxTouchPoints > 0));
 const isLowCore = typeof navigator !== 'undefined' &&
@@ -22,7 +22,20 @@ const isLowCore = typeof navigator !== 'undefined' &&
 
 export const MAX_SHADOW_BLUR = (isTouchDevice || isLowCore) ? 0 : Infinity;
 
-if (typeof CanvasRenderingContext2D !== 'undefined' && MAX_SHADOW_BLUR < Infinity) {
+// Also zeroed while PostFX is on: its bloom pass supplies the glow, and large
+// shadowBlur radii on boss-sized shapes cost the GPU rasterizer enough to halve
+// the frame rate during boss fights (measured ~30fps → 90-120fps without).
+let shadowBlurCap = MAX_SHADOW_BLUR;
+
+export function setShadowBlurEnabled(enabled) {
+    shadowBlurCap = enabled ? MAX_SHADOW_BLUR : 0;
+}
+
+export function capShadowBlur(value) {
+    return value > shadowBlurCap ? shadowBlurCap : value;
+}
+
+if (typeof CanvasRenderingContext2D !== 'undefined') {
     const desc = Object.getOwnPropertyDescriptor(
         CanvasRenderingContext2D.prototype, 'shadowBlur');
     if (desc && desc.set && desc.get) {
@@ -30,7 +43,7 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && MAX_SHADOW_BLUR < Infinit
             configurable: true,
             get() { return desc.get.call(this); },
             set(value) {
-                desc.set.call(this, value > MAX_SHADOW_BLUR ? MAX_SHADOW_BLUR : value);
+                desc.set.call(this, capShadowBlur(value));
             },
         });
     }

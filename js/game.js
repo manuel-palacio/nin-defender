@@ -1092,6 +1092,7 @@ export class Game {
 
     playKillEffects(e) {
         const fx = KILL_EFFECTS[e.type] || KILL_EFFECTS.asteroid;
+        this.particles.createFlash(e.x, e.y, (e.radius || 15) * 1.3);
         this.particles.createColorExplosion(e.x, e.y, fx.colors, fx.count, 300, 0.8, 5);
         this.particles.createShockwave(e.x, e.y, fx.colors[0]);
         this.shake.shake(fx.shake, 0.15);

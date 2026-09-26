@@ -32,12 +32,11 @@ export class Asteroid extends Enemy {
         this.vertices = Utils.generateAsteroidShape(this.radius, Utils.randomInt(7, 12));
 
         // Rich color palette
-        const hue = Utils.randomInt(15, 50);
-        const sat = Utils.randomInt(15, 40);
-        const lit = Utils.randomInt(30, 50);
+        const hue = Utils.randomInt(10, 30);
+        const sat = Utils.randomInt(8, 22);
+        const lit = Utils.randomInt(32, 46);
         this.baseColor = `hsl(${hue}, ${sat}%, ${lit}%)`;
         this.darkColor = `hsl(${hue}, ${sat + 5}%, ${lit - 15}%)`;
-        this.lightColor = `hsl(${hue}, ${sat - 5}%, ${lit + 15}%)`;
 
         // Craters for texture
         this.craters = [];
@@ -81,55 +80,42 @@ export class Asteroid extends Enemy {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
 
-        // Main body with gradient
-        const grad = ctx.createRadialGradient(
-            -this.radius * 0.2, -this.radius * 0.2, this.radius * 0.1,
-            0, 0, this.radius
-        );
-        grad.addColorStop(0, this.lightColor);
-        grad.addColorStop(0.6, this.baseColor);
-        grad.addColorStop(1, this.darkColor);
-
-        ctx.fillStyle = grad;
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = 1;
-
-        // Clip to asteroid shape for craters
-        ctx.beginPath();
-        ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
-        for (let i = 1; i < this.vertices.length; i++) {
-            ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
-        }
-        ctx.closePath();
+        this.traceOutline(ctx);
+        ctx.fillStyle = this.baseColor;
         ctx.fill();
-        ctx.stroke();
 
-        // Save and clip for internal detail
         ctx.save();
+        ctx.clip();
+        this.drawSurfaceDetail(ctx);
+        // Lighting is applied in world space so the sun stays upper-left (like
+        // the planets) while the rock tumbles underneath it.
+        ctx.rotate(-this.rotation);
+        this.drawLighting(ctx);
+        ctx.restore();
+
+        ctx.rotate(-this.rotation);
+        this.drawRimLight(ctx);
+        ctx.restore();
+    }
+
+    traceOutline(ctx) {
         ctx.beginPath();
         ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
         for (let i = 1; i < this.vertices.length; i++) {
             ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
         }
         ctx.closePath();
-        ctx.clip();
+    }
 
-        // Craters
+    drawSurfaceDetail(ctx) {
         for (const c of this.craters) {
             ctx.fillStyle = this.darkColor;
             ctx.beginPath();
             ctx.arc(c.ox, c.oy, c.r, 0, Math.PI * 2);
             ctx.fill();
-            // Highlight rim
-            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
-            ctx.arc(c.ox - c.r * 0.15, c.oy - c.r * 0.15, c.r, -0.8, 1.0);
-            ctx.stroke();
         }
 
-        // Surface ridges
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
         ctx.lineWidth = 1;
         for (const r of this.ridges) {
             const sx = Math.cos(r.angle) * r.len + r.offset;
@@ -139,17 +125,33 @@ export class Asteroid extends Enemy {
             ctx.quadraticCurveTo(r.offset * 0.5, r.offset * 0.5, sx, sy);
             ctx.stroke();
         }
+    }
 
-        ctx.restore(); // unclip
+    drawLighting(ctx) {
+        const r = this.radius * 1.3;
+        const shade = ctx.createLinearGradient(-r * 0.7, -r * 0.7, r * 0.7, r * 0.7);
+        shade.addColorStop(0, 'rgba(255, 235, 215, 0.35)');
+        shade.addColorStop(0.45, 'rgba(0, 0, 0, 0)');
+        shade.addColorStop(0.7, 'rgba(0, 0, 0, 0.45)');
+        shade.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+    }
 
-        // Subtle edge highlight (top-left light source)
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    drawRimLight(ctx) {
+        // Cool key light on the lit edge, warm nebula bounce on the shadow edge.
+        const r = this.radius;
+        const rim = ctx.createLinearGradient(-r, -r, r, r);
+        rim.addColorStop(0, 'rgba(255, 245, 230, 0.55)');
+        rim.addColorStop(0.4, 'rgba(255, 245, 230, 0)');
+        rim.addColorStop(0.75, 'rgba(200, 30, 20, 0)');
+        rim.addColorStop(1, 'rgba(220, 40, 30, 0.5)');
+        ctx.rotate(this.rotation);
+        this.traceOutline(ctx);
+        ctx.rotate(-this.rotation);
+        ctx.strokeStyle = rim;
         ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.85, -Math.PI * 0.8, -Math.PI * 0.2);
         ctx.stroke();
-
-        ctx.restore();
     }
 }
 

@@ -518,6 +518,7 @@ export class UIRenderer {
             ['X',             'Switch weapon'],
             ['T',             'Cycle trail'],
             ['Y',             'Cycle ship skin'],
+            ['G',             'Toggle post-FX'],
             ['W / S',         'Run mode (classic / daily)'],
             ['P / ESC',       'Pause']
         ];

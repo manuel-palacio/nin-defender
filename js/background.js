@@ -978,6 +978,73 @@ export class AsteroidBelt {
 // ============================================================
 // Background — Assembles all layers
 // ============================================================
+// ============================================================
+// NebulaLayer — pre-rendered, horizontally seamless cloud strip
+// ============================================================
+// Painted once into an offscreen canvas at reduced resolution (it's soft, so
+// upscaling is invisible) and scrolled with wrap-around, so per-frame cost is
+// two drawImage calls regardless of how many blobs make up the cloud.
+const NEBULA_RESOLUTION = 0.5;
+
+export class NebulaLayer {
+    constructor(width, height, { speed, blobCount, palette, alpha }) {
+        this.speed = speed;
+        this.alpha = alpha;
+        this.offset = 0;
+        this.width = width;
+        this.height = height;
+        this.texture = NebulaLayer.paint(width, height, blobCount, palette);
+    }
+
+    static paint(width, height, blobCount, palette) {
+        const texture = document.createElement('canvas');
+        const w = Math.max(1, Math.round(width * NEBULA_RESOLUTION));
+        const h = Math.max(1, Math.round(height * NEBULA_RESOLUTION));
+        texture.width = w;
+        texture.height = h;
+        const ctx = texture.getContext('2d');
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < blobCount; i++) {
+            const x = Math.random() * w;
+            const y = h * (0.5 + (Math.random() - 0.5) * Math.random() * 1.4);
+            const r = Utils.random(0.08, 0.3) * Math.max(w, h);
+            const color = palette[Utils.randomInt(0, palette.length - 1)];
+            // Draw a wrapped copy on each side so the strip tiles seamlessly.
+            for (const wrapX of [x - w, x, x + w]) {
+                NebulaLayer.paintBlob(ctx, wrapX, y, r, color);
+            }
+        }
+        return texture;
+    }
+
+    static paintBlob(ctx, x, y, r, color) {
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, `rgba(${color}, 0.22)`);
+        grad.addColorStop(0.45, `rgba(${color}, 0.08)`);
+        grad.addColorStop(1, `rgba(${color}, 0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+
+    update(dt) {
+        this.offset = (this.offset + this.speed * dt) % this.width;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.globalCompositeOperation = 'lighter';
+        const x = -this.offset;
+        ctx.drawImage(this.texture, x, 0, this.width, this.height);
+        ctx.drawImage(this.texture, x + this.width, 0, this.width, this.height);
+        ctx.restore();
+    }
+}
+
+// RGB triplets — NIN palette: blood red, rust, bruised violet, cold steel.
+const FAR_NEBULA_PALETTE = ['140, 10, 20', '90, 20, 70', '40, 30, 90', '120, 40, 10'];
+const NEAR_NEBULA_PALETTE = ['200, 20, 20', '110, 0, 40', '60, 60, 110'];
+
 export class Background {
     constructor(canvas, assets) {
         this.canvas = canvas;
@@ -986,6 +1053,15 @@ export class Background {
         this.layers = [];
         this.celestialBody = Background.randomCelestialBody(canvas, this.assets);
         this.buildLayers();
+        this.buildNebulae();
+    }
+
+    buildNebulae() {
+        const { width, height } = this.canvas;
+        this.farNebula = new NebulaLayer(width, height,
+            { speed: 4, blobCount: 26, palette: FAR_NEBULA_PALETTE, alpha: 0.65 });
+        this.nearNebula = new NebulaLayer(width, height,
+            { speed: 14, blobCount: 10, palette: NEAR_NEBULA_PALETTE, alpha: 0.3 });
     }
 
     buildLayers() {
@@ -1029,10 +1105,13 @@ export class Background {
         this._skyGrad = null;
         this.celestialBody.resize(canvas);
         this.buildLayers();
+        this.buildNebulae();
     }
 
     update(dt) {
         this.time += dt;
+        this.farNebula.update(dt);
+        this.nearNebula.update(dt);
         for (const layer of this.layers) {
             for (const star of layer) {
                 star.update(dt);
@@ -1044,13 +1123,15 @@ export class Background {
         // Deep space gradient — cached; rebuilt only on resize
         if (!this._skyGrad) {
             const grad = ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-            grad.addColorStop(0, '#0a0a1f');
-            grad.addColorStop(0.5, '#0d0d2b');
-            grad.addColorStop(1, '#0a0a1f');
+            grad.addColorStop(0, '#040308');
+            grad.addColorStop(0.5, '#0a0812');
+            grad.addColorStop(1, '#050306');
             this._skyGrad = grad;
         }
         ctx.fillStyle = this._skyGrad;
         ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.farNebula.draw(ctx);
 
         // Distant stars
         for (const star of this.layers[0]) {
@@ -1063,6 +1144,8 @@ export class Background {
         ctx.globalAlpha = 1 - (this.combatDim || 0);
         this.celestialBody.draw(ctx, this.time);
         ctx.restore();
+
+        this.nearNebula.draw(ctx);
 
         // Medium stars
         for (const star of this.layers[1]) {

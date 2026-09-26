@@ -357,6 +357,19 @@ export class Player {
         return next;
     }
 
+    // Soft cyan halo so the dark hull separates from the dark sky.
+    _drawBacklight(ctx) {
+        const r = this.width * 1.1;
+        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        halo.addColorStop(0, 'rgba(0, 200, 255, 0.38)');
+        halo.addColorStop(1, 'rgba(0, 200, 255, 0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = halo;
+        ctx.fillRect(-r, -r, r * 2, r * 2);
+        ctx.restore();
+    }
+
     _drawShipSkin(ctx, skin) {
         const w = this.width;
         const h = this.height;
@@ -857,6 +870,8 @@ export class Player {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+
+        this._drawBacklight(ctx);
 
         // Ship body — sprite or canvas skin
         if (this.assets.playerShip && this.skinIndex === 0) {

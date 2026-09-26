@@ -59,18 +59,41 @@ export class Particle {
         }
     }
 
+    // Caller (ParticlePool.draw) owns save/restore and the additive blend —
+    // glow comes from overlapping 'lighter' fills plus the PostFX bloom pass
+    // rather than a per-particle shadowBlur.
     draw(ctx) {
         if (!this.active || this.alpha <= 0) return;
-        ctx.save();
         ctx.globalAlpha = this.alpha;
-        ctx.fillStyle = this.color;
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = this.currentSize * 2;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, Math.max(0.5, this.currentSize), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        const length = streakLength(this.vx, this.vy);
+        const width = Math.max(0.5, this.currentSize);
+        if (length > width) {
+            this.drawStreak(ctx, length, width);
+        } else {
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, width, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
+
+    drawStreak(ctx, length, width) {
+        const speed = Math.hypot(this.vx, this.vy);
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = width * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(this.x - (this.vx / speed) * length, this.y - (this.vy / speed) * length);
+        ctx.lineTo(this.x, this.y);
+        ctx.stroke();
+    }
+}
+
+const STREAK_SECONDS = 0.035;
+const MAX_STREAK_LENGTH = 22;
+
+// Fast sparks render as motion-blurred streaks; slow particles stay round.
+export function streakLength(vx, vy) {
+    return Math.min(MAX_STREAK_LENGTH, Math.hypot(vx, vy) * STREAK_SECONDS);
 }
 
 // ============================================================
@@ -110,11 +133,15 @@ export class ParticlePool {
     }
 
     draw(ctx) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
         for (let i = 0; i < this.pool.length; i++) {
             if (this.pool[i].active) {
                 this.pool[i].draw(ctx);
             }
         }
+        ctx.restore();
     }
 
     // --- Effect factories ---
@@ -152,6 +179,13 @@ export class ParticlePool {
                 color
             );
         }
+    }
+
+    // Brief white-hot core at the kill point — sells the "pop" before debris.
+    createFlash(x, y, radius) {
+        const p = this.get();
+        if (!p) return;
+        p.init(x, y, 0, 0, 0.12, radius, '#fff4e0', true, 1);
     }
 
     createTrail(x, y, color, size) {
