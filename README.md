@@ -1,6 +1,6 @@
 # NIN DEFENDER
 
-A Nine Inch Nails-themed space shooter built with HTML5 Canvas and vanilla JavaScript. No frameworks, no dependencies — just pure browser tech.
+A Nine Inch Nails-themed space shooter built with HTML5 Canvas and vanilla JavaScript, with a WebGL post-processing pass on top.
 
 **Play now:** [nin-defender.fly.dev](https://nin-defender.fly.dev/)
 
@@ -132,7 +132,11 @@ All purchases persist across games via localStorage.
 - Dedicated SFX bus (quieter than music)
 
 ### Visuals
-- Industrial NIN aesthetic — dark blacks, blood reds, pre-rendered scan lines
+- Industrial NIN aesthetic — dark blacks, blood reds, scan lines; Bebas Neue display type and Share Tech Mono readouts on every screen (HUD, menu, shop, pause, game over)
+- WebGL post-FX (G toggles): two-scale bloom, filmic highlight roll-off, colour grade, chromatic aberration on shake, vignette, film grain
+- Fractal-noise nebula in two parallax layers, tinted starfield with motion streaks and diffraction spikes, planets with atmosphere haze and day/night shading
+- Light from cached glow sprites instead of canvas shadows: teardrop player bolts, haloed enemy bullets, fireball + shockwave-ring explosions, engine plume in the trail colour, backlit enemies and pickups
+- Boss health bar with name and archetype under the phase title
 - Ship tilts when moving vertically, bullets follow tilt angle
 - Power-up hull glow cycles through active power-up colors
 - Life bar under player ship (green/orange/red)
@@ -144,10 +148,10 @@ All purchases persist across games via localStorage.
 
 ## Tech Stack
 
-- HTML5 Canvas (no frameworks)
-- Vanilla JavaScript (no build step)
+- HTML5 Canvas + a WebGL post-processing overlay (no game framework)
+- Vanilla JavaScript modules, bundled by Vite; GSAP for UI tweens, Zod for stored data
 - Web Audio API (synthesized SFX)
-- Google Fonts (Bebas Neue, Share Tech Mono)
+- Bebas Neue and Share Tech Mono, bundled from Fontsource (no font CDN at runtime)
 - Nginx Alpine (Docker)
 - Fly.io (deployment, 2 machines, auto-sleep)
 - ImageMagick (sprite processing)
@@ -156,8 +160,9 @@ All purchases persist across games via localStorage.
 ## Run Locally
 
 ```bash
-python3 -m http.server 8080
-# open http://localhost:8080
+npm install
+npm run dev
+# open http://localhost:5173
 ```
 
 Or with Docker:
