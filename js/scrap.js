@@ -6,6 +6,7 @@
 // drift left and are lost if they cross the screen edge.
 
 import { Utils } from './utils.js';
+import { drawGlow } from './glow.js';
 
 const DRIFT_SPEED = -55;
 const MAGNET_RADIUS = 130;
@@ -67,22 +68,34 @@ export class ScrapField {
         return collected;
     }
 
+    // Spinning amber shards, each in its own pool of light.
     draw(ctx) {
         if (this.drops.length === 0) return;
         ctx.save();
         for (const drop of this.drops) {
             const fade = Math.min(1, drop.life / 1.5);
-            const size = 4 + Math.min(4, drop.value);
+            const size = 5 + Math.min(4, drop.value);
             ctx.globalAlpha = fade * (drop.life < 2 && Math.sin(drop.life * 20) < 0 ? 0.4 : 1);
+            ctx.globalCompositeOperation = 'lighter';
+            drawGlow(ctx, '#ff9a1f', drop.x, drop.y, size * 2.6, 0.6);
+            ctx.globalCompositeOperation = 'source-over';
             ctx.translate(drop.x, drop.y);
             ctx.rotate(drop.spin);
-            ctx.fillStyle = '#ffaa00';
-            ctx.shadowColor = '#ff8800';
-            ctx.shadowBlur = 8;
-            ctx.fillRect(-size / 2, -size / 2, size, size);
+            ctx.fillStyle = '#ffb02e';
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 0.75);
+            ctx.lineTo(size * 0.5, 0);
+            ctx.lineTo(0, size * 0.75);
+            ctx.lineTo(-size * 0.5, 0);
+            ctx.closePath();
+            ctx.fill();
             ctx.fillStyle = '#fff2cc';
-            ctx.shadowBlur = 0;
-            ctx.fillRect(-size / 4, -size / 4, size / 2, size / 2);
+            ctx.beginPath();
+            ctx.moveTo(0, -size * 0.75);
+            ctx.lineTo(size * 0.5, 0);
+            ctx.lineTo(0, 0);
+            ctx.closePath();
+            ctx.fill();
             ctx.rotate(-drop.spin);
             ctx.translate(-drop.x, -drop.y);
         }

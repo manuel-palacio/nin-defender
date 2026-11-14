@@ -3,6 +3,7 @@
 // ============================================================
 
 import { Utils } from './utils.js';
+import { drawGlow } from './glow.js';
 
 export class Particle {
     constructor() {
@@ -22,6 +23,7 @@ export class Particle {
         this.active = false;
         this.shrink = true;
         this.friction = 0.98;
+        this.kind = 'spark'; // 'spark' | 'flash' | 'ring'
     }
 
     init(x, y, vx, vy, life, size, color, shrink = true, friction = 0.98) {
@@ -37,6 +39,7 @@ export class Particle {
         this.active = true;
         this.shrink = shrink;
         this.friction = friction;
+        this.kind = 'spark';
     }
 
     update(dt) {
@@ -60,10 +63,12 @@ export class Particle {
     }
 
     // Caller (ParticlePool.draw) owns save/restore and the additive blend —
-    // glow comes from overlapping 'lighter' fills plus the PostFX bloom pass
-    // rather than a per-particle shadowBlur.
+    // each spark is a hard core inside a soft halo stamped from a cached
+    // sprite, so the glow costs a drawImage rather than a shadowBlur.
     draw(ctx) {
         if (!this.active || this.alpha <= 0) return;
+        if (this.kind === 'flash') return this.drawFlash(ctx);
+        if (this.kind === 'ring') return this.drawRing(ctx);
         ctx.globalAlpha = this.alpha;
         const length = streakLength(this.vx, this.vy);
         const width = Math.max(0.5, this.currentSize);
@@ -75,6 +80,7 @@ export class Particle {
             ctx.arc(this.x, this.y, width, 0, Math.PI * 2);
             ctx.fill();
         }
+        drawGlow(ctx, this.color, this.x, this.y, width * 4, 0.45);
     }
 
     drawStreak(ctx, length, width) {
@@ -84,6 +90,27 @@ export class Particle {
         ctx.beginPath();
         ctx.moveTo(this.x - (this.vx / speed) * length, this.y - (this.vy / speed) * length);
         ctx.lineTo(this.x, this.y);
+        ctx.stroke();
+    }
+
+    // Fireball: a wide coloured bloom around a white-hot centre, both
+    // collapsing as the flash dies.
+    drawFlash(ctx) {
+        const progress = this.life / this.maxLife;
+        ctx.globalAlpha = 1;
+        drawGlow(ctx, this.color, this.x, this.y, this.size * (2.6 - progress), progress);
+        drawGlow(ctx, '#ffffff', this.x, this.y, this.size * (0.6 + 0.9 * progress), progress);
+    }
+
+    // Shockwave: a thin ring racing outward, fast at first, fading as it goes.
+    drawRing(ctx) {
+        const progress = this.life / this.maxLife;
+        const eased = 1 - progress * progress;
+        ctx.globalAlpha = progress * 0.9;
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 0.75 + 3 * progress;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size * eased, 0, Math.PI * 2);
         ctx.stroke();
     }
 }
@@ -185,7 +212,16 @@ export class ParticlePool {
     createFlash(x, y, radius) {
         const p = this.get();
         if (!p) return;
-        p.init(x, y, 0, 0, 0.12, radius, '#fff4e0', true, 1);
+        p.init(x, y, 0, 0, 0.16, radius, '#ffb066', true, 1);
+        p.kind = 'flash';
+    }
+
+    // Single expanding ring out to `radius`.
+    createRing(x, y, color, radius, life = 0.4) {
+        const p = this.get();
+        if (!p) return;
+        p.init(x, y, 0, 0, life, radius, color, false, 1);
+        p.kind = 'ring';
     }
 
     createTrail(x, y, color, size) {
@@ -202,8 +238,10 @@ export class ParticlePool {
         );
     }
 
-    // Evenly-spaced particles at uniform speed read as an expanding ring.
+    // A ring plus evenly-spaced sparks riding out with it.
     createShockwave(x, y, color, count = 16, speed = 320) {
+        this.createRing(x, y, color, speed * 0.3);
+        this.createRing(x, y, '#ffffff', speed * 0.18, 0.25);
         for (let i = 0; i < count; i++) {
             const p = this.get();
             if (!p) continue;

@@ -10,6 +10,7 @@ import { SpiderDrone } from './spider-drone.js'
 import { AlienGhost } from './alien-ghost.js'
 import { AlienDevil } from './alien-devil.js'
 import { Boss } from './boss.js'
+import { drawGlow } from '../glow.js'
 
 export const PHASES = [
     // Tuned against a live play-test (2026-06): the previous curve (3000 for
@@ -30,6 +31,15 @@ export const PHASES = [
 ];
 
 const BOSS_SPAWN_THROTTLE = 2.0;
+
+const BACKLIGHT = {
+    ship: '#ff6a3c',
+    drone: '#5cff7a',
+    mine: '#ff7ac8',
+    spider: '#8cff3c',
+    bomber: '#c75cff',
+    devil: '#ff4a1a',
+};
 
 // Screen-area spawn cap — late phases were stacking 40+ enemies on a laptop
 // screen, which made bullets unreadable. Roughly 28 at 1280x800.
@@ -323,9 +333,22 @@ export class EnemySpawner {
         for (const e of this.enemies) {
             if (!e.active) continue;
             if (e.elite) this._drawEliteAura(ctx, e);
+            this._drawBacklight(ctx, e);
             e.draw(ctx);
             if (e.hitFlash > 0) this._drawHitFlash(ctx, e);
         }
+    }
+
+    // Coloured haze behind each creature so its dark body separates from the
+    // dark sky. Rocks stay unlit; cloaking enemies keep their own fade.
+    _drawBacklight(ctx, e) {
+        const color = e.type === 'boss' ? e.color : BACKLIGHT[e.type];
+        if (!color) return;
+        const r = (e.radius || 12) * (e.type === 'boss' ? 2.1 : 2.6);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, color, e.x, e.y, r, e.type === 'boss' ? 0.34 : 0.4);
+        ctx.restore();
     }
 
     // One additive glow over the enemy. Not ctx.filter: a filter re-rasterizes

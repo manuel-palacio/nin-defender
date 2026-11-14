@@ -3,6 +3,7 @@
 // ============================================================
 
 import { POWERUP_ASSET_MAP } from './utils.js';
+import { drawGlow } from './glow.js';
 
 export const POWERUP_TYPES = {
     RAPID_FIRE:      { name: 'Rapid Fire',     color: '#ffdd00', duration: 8 },
@@ -66,6 +67,11 @@ export class PowerUp {
 
         ctx.save();
 
+        // Pool of light behind the pickup
+        ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, info.color, this.x, this.y, r * 2.6, 0.55);
+        ctx.globalCompositeOperation = 'source-over';
+
         // Outer glow ring
         ctx.strokeStyle = info.color;
         ctx.shadowColor = info.color;
@@ -96,7 +102,7 @@ export class PowerUp {
 
             ctx.fillStyle = '#000';
             ctx.shadowBlur = 0;
-            ctx.font = `bold ${Math.floor(r)}px Courier New`;
+            ctx.font = `bold ${Math.floor(r)}px Share Tech Mono, Courier New, monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 

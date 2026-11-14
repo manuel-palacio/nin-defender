@@ -8,6 +8,11 @@ import { POWERUP_TYPES } from './powerups.js';
 import { Schemas } from './schemas.js';
 import { emitter } from './events.js';
 import { WEAPON_DEFS, WEAPON_ORDER } from './weapons.js';
+import { drawGlow } from './glow.js';
+
+// Ship art is pre-scaled to this many pixels per drawn pixel: enough for a
+// DPR-2 screen with headroom for the banking rotation.
+const SHIP_SPRITE_OVERSAMPLE = 3;
 
 // Skin passives — keyed by Player.skinIndex (matches order of skinNames).
 // applyUpgrades() reads this AFTER computing base stats so the modifiers
@@ -359,15 +364,52 @@ export class Player {
 
     // Soft cyan halo so the dark hull separates from the dark sky.
     _drawBacklight(ctx) {
-        const r = this.width * 1.1;
-        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-        halo.addColorStop(0, 'rgba(0, 200, 255, 0.38)');
-        halo.addColorStop(1, 'rgba(0, 200, 255, 0)');
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = halo;
-        ctx.fillRect(-r, -r, r * 2, r * 2);
+        drawGlow(ctx, '#00c8ff', 0, 0, this.width * 1.5, 0.42);
         ctx.restore();
+    }
+
+    // Edge-lit copy of the ship art at draw resolution. Scaling the 1024px
+    // source down to ~60px on every frame shimmers as the ship banks; halving
+    // it in steps once gives a clean image, and a pale rim baked around the
+    // silhouette keeps the dark hull readable over any background.
+    _getShipSprite(img, drawH) {
+        const artHeight = Math.round(drawH * SHIP_SPRITE_OVERSAMPLE);
+        if (this._shipSprite && this._shipSprite.artHeight === artHeight) return this._shipSprite;
+
+        let source = img;
+        let height = img.height;
+        while (height / 2 >= artHeight) {
+            height /= 2;
+            const step = document.createElement('canvas');
+            step.width = Math.round(height * (img.width / img.height));
+            step.height = height;
+            step.getContext('2d').drawImage(source, 0, 0, step.width, step.height);
+            source = step;
+        }
+
+        const artWidth = Math.round(artHeight * (img.width / img.height));
+        const rim = Math.max(1, artHeight * 0.008);
+        const pad = Math.ceil(rim) + 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = artWidth + pad * 2;
+        canvas.height = artHeight + pad * 2;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            ctx.drawImage(source, pad + Math.cos(angle) * rim, pad + Math.sin(angle) * rim, artWidth, artHeight);
+        }
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = 'rgba(140, 205, 255, 0.38)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = 'source-over';
+        if ('filter' in ctx) ctx.filter = 'brightness(1.5) saturate(1.2)';
+        ctx.drawImage(source, pad, pad, artWidth, artHeight);
+
+        this._shipSprite = { canvas, artHeight };
+        return this._shipSprite;
     }
 
     _drawShipSkin(ctx, skin) {
@@ -846,29 +888,25 @@ export class Player {
         // Bank/tilt on vertical movement (smoothed in update())
         ctx.rotate(this.tilt);
 
-        // Engine trail — scales with speed, uses trail color
+        // Engine plume — a coloured flame around a white-hot core, stretching
+        // with speed. Additive sprites, so it glows without shadowBlur.
         const spd = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
         const speedFrac = Math.min(1, spd / this.speed);
-        const flicker = 0.7 + 0.3 * Math.sin(this.engineTime * 25);
-        const trailLen = (12 + 15 * speedFrac) * flicker;
-
+        const flicker = 0.8 + 0.2 * Math.sin(this.engineTime * 31) * Math.sin(this.engineTime * 17);
+        const plumeLen = this.width * (0.75 + 0.75 * speedFrac) * flicker;
+        const nozzleX = -this.height * 0.78;
+        const plumeColor = this.trailColor || '#00ffff';
         ctx.save();
-        ctx.shadowColor = '#00ffff';
-        ctx.shadowBlur = 12 * flicker;
-        ctx.fillStyle = `rgba(0, 255, 255, ${0.5 * flicker})`;
-        ctx.beginPath();
-        ctx.moveTo(-this.width / 2, -4);
-        ctx.lineTo(-this.width / 2 - trailLen, 0);
-        ctx.lineTo(-this.width / 2, 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.4 * flicker})`;
-        ctx.beginPath();
-        ctx.moveTo(-this.width / 2, -2);
-        ctx.lineTo(-this.width / 2 - trailLen * 0.5, 0);
-        ctx.lineTo(-this.width / 2, 2);
-        ctx.closePath();
-        ctx.fill();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.translate(nozzleX, 0);
+        ctx.save();
+        ctx.translate(-plumeLen * 0.42, 0);
+        ctx.scale(plumeLen * 0.8, this.height * 0.3);
+        drawGlow(ctx, plumeColor, 0, 0, 1, 0.95);
+        ctx.restore();
+        ctx.translate(-plumeLen * 0.16, 0);
+        ctx.scale(plumeLen * 0.36, this.height * 0.13);
+        drawGlow(ctx, '#ffffff', 0, 0, 1, 0.95);
         ctx.restore();
 
         this._drawBacklight(ctx);
@@ -877,10 +915,13 @@ export class Player {
         if (this.assets.playerShip && this.skinIndex === 0) {
             const img = this.assets.playerShip;
             const drawH = this.height * 2;
-            const drawW = drawH * (img.width / img.height);
+            const sprite = this._getShipSprite(img, drawH);
+            const scale = drawH / sprite.artHeight;
             ctx.save();
             ctx.rotate(Math.PI / 2);
-            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.drawImage(sprite.canvas,
+                -sprite.canvas.width * scale / 2, -sprite.canvas.height * scale / 2,
+                sprite.canvas.width * scale, sprite.canvas.height * scale);
             ctx.restore();
         } else {
             this._drawShipSkin(ctx, this.skinIndex);

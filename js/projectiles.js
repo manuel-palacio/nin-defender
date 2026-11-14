@@ -3,6 +3,9 @@
 // ============================================================
 
 import { GAME_SCALE } from './constants.js';
+import { drawGlow, drawBolt } from './glow.js';
+
+const ENEMY_BULLET_COLOR = '#ff2266';
 
 export class Projectile {
     constructor() {
@@ -62,43 +65,38 @@ export class Projectile {
         }
     }
 
+    // Caller (ProjectilePool.draw) owns save/restore.
     draw(ctx) {
         if (!this.active) return;
-        ctx.save();
-        ctx.fillStyle = this.color;
-        ctx.shadowColor = this.glowColor;
-        ctx.shadowBlur = 12;
-
         if (this.isEnemy) {
             // Enemy bullets share one unmistakable look regardless of who
-            // fired them: dark outline, hot magenta body, white core.
-            ctx.shadowColor = '#ff2266';
+            // fired them: magenta halo, dark outline, hot body, white core.
+            ctx.globalCompositeOperation = 'lighter';
+            drawGlow(ctx, ENEMY_BULLET_COLOR, this.x, this.y, this.radius * 3.6, 0.7);
+            ctx.globalCompositeOperation = 'source-over';
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius + 1.5, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
             ctx.fill();
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-            ctx.fillStyle = '#ff2266';
+            ctx.fillStyle = ENEMY_BULLET_COLOR;
             ctx.fill();
-            ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius * 0.45, 0, Math.PI * 2);
             ctx.fillStyle = '#ffffff';
             ctx.fill();
         } else {
-            // Player bullets — elongated ellipse
-            ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.radius * 3, this.radius, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Bright core
-            ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 4;
-            ctx.beginPath();
-            ctx.ellipse(this.x, this.y, this.radius * 1.5, this.radius * 0.5, 0, 0, Math.PI * 2);
-            ctx.fill();
+            // Player bolts — a teardrop of light pointing along its heading.
+            ctx.globalCompositeOperation = 'lighter';
+            drawGlow(ctx, this.color, this.x, this.y, this.radius * 4, 0.5);
+            ctx.translate(this.x, this.y);
+            const angle = Math.atan2(this.vy, this.vx);
+            ctx.rotate(angle);
+            drawBolt(ctx, this.color, this.radius * 1.15);
+            ctx.rotate(-angle);
+            ctx.translate(-this.x, -this.y);
         }
-        ctx.restore();
     }
 }
 
@@ -176,11 +174,13 @@ export class ProjectilePool {
     }
 
     draw(ctx) {
+        ctx.save();
         for (let i = 0; i < this.pool.length; i++) {
             if (this.pool[i].active) {
                 this.pool[i].draw(ctx);
             }
         }
+        ctx.restore();
     }
 
     getActive() {
