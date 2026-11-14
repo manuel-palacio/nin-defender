@@ -3,8 +3,9 @@
 // ============================================================
 // The game keeps drawing with Canvas 2D. Each frame this module uploads that
 // canvas as a texture and composites it through a small shader chain onto a
-// WebGL canvas stacked on top: bright-pass → separable blur (bloom), then
-// chromatic aberration, vignette, scanlines and film grain.
+// WebGL canvas stacked on top: bright-pass → two-scale separable blur (a tight
+// glow plus a wide halo), then chromatic aberration, a filmic shoulder and
+// colour grade, vignette, scanlines and film grain.
 //
 // The 2D canvas stays visible underneath (the opaque overlay covers it) so its
 // touch/click listeners keep working — the overlay has pointer-events: none.
@@ -15,9 +16,10 @@
 import { setShadowBlurEnabled } from './constants.js';
 
 const STORAGE_KEY = 'nin-defender-postfx';
-const BLOOM_THRESHOLD = 0.55;
-const BLOOM_STRENGTH = 1.1;
-const BLUR_PASSES = 3;
+const BLOOM_THRESHOLD = 0.5;
+const GLOW_STRENGTH = 0.6;   // tight glow, quarter resolution
+const HALO_STRENGTH = 0.55;  // wide halo, eighth resolution
+const BLUR_PASSES = 2;
 const SHAKE_FOR_FULL_ABERRATION = 20;
 
 const VERTEX_SHADER = `
@@ -64,8 +66,10 @@ const COMPOSITE_SHADER = `
 precision mediump float;
 varying vec2 vUv;
 uniform sampler2D uScene;
-uniform sampler2D uBloom;
-uniform float uBloomStrength;
+uniform sampler2D uGlow;
+uniform sampler2D uHalo;
+uniform float uGlowStrength;
+uniform float uHaloStrength;
 uniform float uAberration;
 uniform float uTime;
 uniform float uPixelRatio;
@@ -79,24 +83,36 @@ void main() {
     float dist = length(fromCenter);
 
     // Lens-style fringing grows toward the edges; shake pushes it further.
-    vec2 fringe = fromCenter * (0.0025 + uAberration * 0.012) * dist;
+    vec2 fringe = fromCenter * (0.0018 + uAberration * 0.012) * dist;
     vec3 scene = vec3(
         texture2D(uScene, vUv + fringe).r,
         texture2D(uScene, vUv).g,
         texture2D(uScene, vUv - fringe).b
     );
 
-    vec3 bloom = texture2D(uBloom, vUv).rgb;
-    vec3 color = scene + bloom * uBloomStrength;
+    vec3 color = scene
+        + texture2D(uGlow, vUv).rgb * uGlowStrength
+        + texture2D(uHalo, vUv).rgb * uHaloStrength;
 
-    float scanline = 0.965 + 0.035 * sin(gl_FragCoord.y / uPixelRatio * 3.14159);
+    // Filmic shoulder: highlights roll off toward white instead of clipping
+    // flat, so stacked glows keep their shape and hue.
+    vec3 over = max(color - 0.7, 0.0);
+    color = min(color, 0.7) + over / (1.0 + over * 1.4);
+
+    // Grade: a touch more saturation and contrast than the raw canvas.
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(luma), color, 1.14);
+    color = mix(color, color * color * (3.0 - 2.0 * color), 0.22);
+
+    float scanline = 0.972 + 0.028 * sin(gl_FragCoord.y / uPixelRatio * 3.14159);
     color *= scanline;
 
-    float vignette = smoothstep(0.95, 0.3, dist);
-    color *= mix(0.55, 1.0, vignette);
+    float vignette = smoothstep(1.0, 0.35, dist);
+    color *= mix(0.62, 1.0, vignette);
 
+    // Grain sits in the shadows and midtones; highlights stay clean.
     float grain = hash(gl_FragCoord.xy + fract(uTime) * 100.0) - 0.5;
-    color += grain * 0.045;
+    color += grain * 0.035 * (1.0 - luma * 0.7);
 
     gl_FragColor = vec4(color, 1.0);
 }`;
@@ -173,6 +189,7 @@ export class PostFX {
 
         this.sceneTexture = this.createTexture();
         this.bloomTargets = [this.createRenderTarget(), this.createRenderTarget()];
+        this.haloTargets = [this.createRenderTarget(), this.createRenderTarget()];
         this.width = 0;
         this.height = 0;
     }
@@ -228,13 +245,18 @@ export class PostFX {
         this.overlay.height = height;
         this.bloomWidth = Math.max(1, Math.floor(width / 4));
         this.bloomHeight = Math.max(1, Math.floor(height / 4));
+        this.haloWidth = Math.max(1, Math.floor(width / 8));
+        this.haloHeight = Math.max(1, Math.floor(height / 8));
+        for (const target of this.bloomTargets) this.allocateTarget(target, this.bloomWidth, this.bloomHeight);
+        for (const target of this.haloTargets) this.allocateTarget(target, this.haloWidth, this.haloHeight);
+    }
+
+    allocateTarget(target, width, height) {
         const gl = this.gl;
-        for (const target of this.bloomTargets) {
-            gl.bindTexture(gl.TEXTURE_2D, target.texture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.bloomWidth, this.bloomHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target.texture, 0);
-        }
+        gl.bindTexture(gl.TEXTURE_2D, target.texture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.framebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, target.texture, 0);
     }
 
     uploadScene() {
@@ -254,15 +276,26 @@ export class PostFX {
         gl.uniform1f(this.uniform(this.brightProgram, 'uThreshold'), BLOOM_THRESHOLD);
         this.drawQuad();
 
+        const size = { width: this.bloomWidth, height: this.bloomHeight };
         for (let pass = 0; pass < BLUR_PASSES; pass++) {
             const spread = pass + 1;
-            this.blur(first, second, spread / this.bloomWidth, 0);
-            this.blur(second, first, 0, spread / this.bloomHeight);
+            this.blur(first, second, spread / size.width, 0, size);
+            this.blur(second, first, 0, spread / size.height, size);
+        }
+
+        // Wide halo: the blurred glow, downsampled again and blurred further.
+        const [haloFirst, haloSecond] = this.haloTargets;
+        const haloSize = { width: this.haloWidth, height: this.haloHeight };
+        this.blur(first, haloFirst, 1 / size.width, 0, haloSize);
+        for (let pass = 0; pass < BLUR_PASSES; pass++) {
+            const spread = pass + 1;
+            this.blur(haloFirst, haloSecond, 0, spread / haloSize.height, haloSize);
+            this.blur(haloSecond, haloFirst, spread / haloSize.width, 0, haloSize);
         }
     }
 
-    blur(from, to, stepX, stepY) {
-        this.useProgram(this.blurProgram, to, this.bloomWidth, this.bloomHeight);
+    blur(from, to, stepX, stepY, size) {
+        this.useProgram(this.blurProgram, to, size.width, size.height);
         this.bindTexture(from.texture, 0, this.blurProgram, 'uSource');
         this.gl.uniform2f(this.uniform(this.blurProgram, 'uStep'), stepX, stepY);
         this.drawQuad();
@@ -273,8 +306,10 @@ export class PostFX {
         const program = this.compositeProgram;
         this.useProgram(program, null, this.width, this.height);
         this.bindTexture(this.sceneTexture, 0, program, 'uScene');
-        this.bindTexture(this.bloomTargets[0].texture, 1, program, 'uBloom');
-        gl.uniform1f(this.uniform(program, 'uBloomStrength'), BLOOM_STRENGTH);
+        this.bindTexture(this.bloomTargets[0].texture, 1, program, 'uGlow');
+        this.bindTexture(this.haloTargets[0].texture, 2, program, 'uHalo');
+        gl.uniform1f(this.uniform(program, 'uGlowStrength'), GLOW_STRENGTH);
+        gl.uniform1f(this.uniform(program, 'uHaloStrength'), HALO_STRENGTH);
         gl.uniform1f(this.uniform(program, 'uAberration'), aberration);
         gl.uniform1f(this.uniform(program, 'uTime'), time);
         gl.uniform1f(this.uniform(program, 'uPixelRatio'), this.width / this.source.clientWidth || 1);
