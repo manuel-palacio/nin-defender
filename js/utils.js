@@ -2,6 +2,8 @@
 // utils.js — Utility functions, audio manager, screen shake
 // ============================================================
 
+import { COLOR, display, mono, track, meter } from './theme.js';
+
 // GAME_SCALE + updateGameScale moved to constants.js — import from there.
 
 // mulberry32 — small seedable PRNG for daily runs. Every gameplay module
@@ -736,35 +738,26 @@ export class AssetLoader {
         const w = canvas.width;
         const h = canvas.height;
 
-        // Background — pure black
-        ctx.fillStyle = '#0a0a0a';
+        ctx.fillStyle = '#060407';
         ctx.fillRect(0, 0, w, h);
 
-        // Title — blood red
+        ctx.save();
         ctx.textAlign = 'center';
-        ctx.font = `bold ${Math.min(w * 0.05, 36)}px Courier New`;
-        ctx.fillStyle = '#cc0000';
-        ctx.shadowColor = '#cc0000';
-        ctx.shadowBlur = 15;
-        ctx.fillText('NIN DEFENDER', w / 2, h * 0.4);
-
-        // Loading text
+        ctx.font = display(Math.min(w * 0.11, 110));
+        track(ctx, 4);
+        ctx.fillStyle = COLOR.red;
+        ctx.shadowColor = COLOR.red;
+        ctx.shadowBlur = 24;
+        ctx.fillText('NIN DEFENDER', w / 2, h * 0.47);
         ctx.shadowBlur = 0;
-        ctx.font = '13px Courier New';
-        ctx.fillStyle = '#444';
-        ctx.fillText('LOADING...', w / 2, h * 0.52);
 
-        // Progress bar — red fill on dark grey
-        const barW = Math.min(300, w * 0.6);
-        const barH = 4;
-        const bx = (w - barW) / 2;
-        const by = h * 0.57;
-        ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(bx, by, barW, barH);
-        ctx.fillStyle = '#cc0000';
-        ctx.shadowColor = '#cc0000';
-        ctx.shadowBlur = 6;
-        ctx.fillRect(bx, by, barW * progress, barH);
-        ctx.shadowBlur = 0;
+        ctx.font = mono(11);
+        track(ctx, 6);
+        ctx.fillStyle = COLOR.dim;
+        ctx.fillText(`LOADING ${Math.round(progress * 100)}%`, w / 2, h * 0.47 + 62);
+        ctx.restore();
+
+        const barW = Math.min(360, w * 0.6);
+        meter(ctx, (w - barW) / 2, h * 0.47 + 30, barW, 3, progress, COLOR.red);
     }
 }

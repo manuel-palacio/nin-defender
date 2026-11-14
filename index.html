@@ -29,8 +29,16 @@
         <div id="bombBtn" class="touch-action-btn">BOMB</div>
         <div id="weaponBtn" class="touch-action-btn">WPN</div>
     </div>
-    <div id="pauseBtn" title="Pause">&#x23F8;</div>
-    <div id="muteBtn" title="Toggle Sound">&#x1f50a;</div>
+    <div id="pauseBtn" class="hud-btn" title="Pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+    </div>
+    <div id="muteBtn" class="hud-btn" title="Toggle Sound">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>
+            <path class="sound-on" d="M15 8.5a5 5 0 0 1 0 7M17.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path class="sound-off" d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+    </div>
     <div id="portraitWarning">
         <div class="rotate-icon">📱</div>
         <p>ROTATE YOUR DEVICE TO LANDSCAPE</p>

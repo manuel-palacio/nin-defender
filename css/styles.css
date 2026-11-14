@@ -1,7 +1,5 @@
 /* === NIN DEFENDER — Industrial / Nine Inch Nails aesthetic === */
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&display=swap');
-
 :root {
     --nin-black:   #0a0a0a;
     --nin-dark:    #141414;
@@ -126,49 +124,51 @@ html, body {
     box-shadow: 0 0 30px rgba(255, 34, 0, 0.4);
 }
 
-#muteBtn {
+/* Pause + mute: matching square buttons in the top-right corner. */
+.hud-btn {
     position: fixed;
     top: 10px;
-    right: 60px;
     z-index: 20;
-    background: rgba(20, 20, 20, 0.6);
-    border: 1px solid rgba(204, 0, 0, 0.3);
-    border-radius: 2px;
-    color: var(--nin-light);
-    font-size: 20px;
-    padding: 4px 8px;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 6, 8, 0.6);
+    border: 1px solid rgba(255, 31, 31, 0.35);
+    border-radius: 3px;
+    color: var(--nin-white);
     cursor: pointer;
-    opacity: 0.5;
-    transition: opacity 0.2s, border-color 0.2s;
+    opacity: 0.7;
+    transition: opacity 0.2s, border-color 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+.hud-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+.hud-btn:hover, .hud-btn:active {
+    opacity: 1;
+    border-color: var(--nin-hot);
+    background: rgba(255, 31, 31, 0.18);
 }
 
-#muteBtn:hover {
-    opacity: 1;
-    border-color: var(--nin-red);
+#muteBtn {
+    right: 16px;
+}
+#muteBtn .sound-off,
+#muteBtn.muted .sound-on {
+    display: none;
+}
+#muteBtn.muted .sound-off {
+    display: inline;
 }
 
 #pauseBtn {
-    position: fixed;
-    top: 80px;
-    left: 10px;
-    z-index: 20;
-    background: rgba(20, 20, 20, 0.6);
-    border: 1px solid rgba(204, 0, 0, 0.3);
-    border-radius: 2px;
-    color: var(--nin-light);
-    font-size: 22px;
-    line-height: 1;
-    padding: 4px 10px;
-    cursor: pointer;
-    opacity: 0.5;
-    transition: opacity 0.2s, border-color 0.2s;
-    -webkit-tap-highlight-color: transparent;
+    right: 58px;
     touch-action: none;
-    user-select: none;
-}
-#pauseBtn:hover, #pauseBtn:active {
-    opacity: 1;
-    border-color: var(--nin-red);
 }
 
 /* Portrait warning overlay */
@@ -253,10 +253,10 @@ html, body {
 }
 
 /* ===== MOBILE: JS adds .touch-device to body ===== */
-body.touch-device #touchControls {
+body.touch-device.in-play #touchControls {
     display: block;
 }
-body.touch-device #touchActions {
+body.touch-device.in-play #touchActions {
     display: flex;
 }
 body.touch-device #gameCanvas {
@@ -270,8 +270,9 @@ body.touch-device #muteBtn {
 body.touch-device #pauseBtn {
     top: 90px;
     left: 10px;
-    font-size: 26px;
-    padding: 6px 14px;
+    right: auto;
+    width: 44px;
+    height: 44px;
 }
 
 /* Portrait warning — shown by JS when touch + portrait */

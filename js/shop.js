@@ -4,6 +4,7 @@
 
 import { SKIN_PASSIVES } from './player.js';
 import { WEAPON_DEFS } from './weapons.js';
+import { COLOR, display, mono, track, uiScale, panel, pips, drawVignette, glitchTitle } from './theme.js';
 
 // ShopItem is polymorphic on `kind`: 'upgrade' | 'consumable' | 'cosmetic' | 'weapon'.
 // Each kind owns its own getCost/getDescription/canPurchase/apply via injected
@@ -174,144 +175,126 @@ export class Shop {
     draw(ctx, canvas, player) {
         const w = canvas.width;
         const h = canvas.height;
+        const s = uiScale(w, h);
         this._isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         ctx.save();
+        ctx.textBaseline = 'alphabetic';
 
         // Dark overlay
-        ctx.fillStyle = 'rgba(5, 5, 5, 0.92)';
+        ctx.fillStyle = 'rgba(6, 4, 7, 0.9)';
         ctx.fillRect(0, 0, w, h);
-
-        // Scan lines
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        for (let y = 0; y < h; y += 4) ctx.fillRect(0, y, w, 2);
+        drawVignette(ctx, w, h, 0.6);
 
         // Title
-        ctx.textAlign = 'center';
-        ctx.font = `bold ${Math.min(w * 0.04, 32)}px Courier New`;
-        ctx.fillStyle = '#cc0000';
-        ctx.shadowColor = '#cc0000';
-        ctx.shadowBlur = 15;
-        ctx.fillText('— UPGRADE SHOP —', w / 2, h * 0.1);
-        ctx.shadowBlur = 0;
+        glitchTitle(ctx, 'UPGRADE SHOP', w / 2, h * 0.115, Math.min(w * 0.08, h * 0.11, 68), { split: 2, glow: 16 });
 
         // Scrap counter
-        ctx.font = 'bold 18px Courier New';
-        ctx.fillStyle = '#993300';
-        ctx.fillText(`SCRAP: ${player.scrap}`, w / 2, h * 0.16);
+        ctx.textAlign = 'center';
+        ctx.font = display(Math.max(16, 24 * s));
+        track(ctx, 3);
+        ctx.fillStyle = COLOR.amber;
+        ctx.shadowColor = COLOR.amber;
+        ctx.shadowBlur = 8;
+        ctx.fillText(`◆ ${player.scrap} SCRAP`, w / 2, h * 0.175);
+        ctx.shadowBlur = 0;
+        track(ctx, 0);
 
         // Items
         const startY = h * 0.24;
         // Scale items to fit — ensure CONTINUE button isn't clipped
         const availableH = h * 0.6; // space between startY and continue button
         const itemH = Math.min(availableH / SHOP_ITEMS.length, 55);
-        const itemW = Math.min(w * 0.7, 500);
+        const itemW = Math.min(w * 0.88, 720);
         const startX = (w - itemW) / 2;
-
-        ctx.font = '14px Courier New';
-        ctx.textAlign = 'left';
+        const nameSize = Math.max(12, Math.min(19, itemH * 0.56));
+        const textSize = Math.max(10, Math.min(13, itemH * 0.4));
+        const descX = startX + Math.max(120, itemW * 0.24);
+        const rowTop = iy => iy - itemH * 0.6;
+        const rowH = itemH - 4;
+        const baseline = iy => rowTop(iy) + rowH / 2 + nameSize * 0.36;
 
         let prevKind = null;
         for (let i = 0; i < SHOP_ITEMS.length; i++) {
             const item = SHOP_ITEMS[i];
             const selected = i === this.selectedIndex;
             const iy = startY + i * itemH;
+            const by = baseline(iy);
 
             // Section divider between kinds (upgrade → consumable → cosmetic)
             if (prevKind && prevKind !== item.kind) {
-                ctx.strokeStyle = 'rgba(204, 0, 0, 0.2)';
+                ctx.strokeStyle = 'rgba(255, 31, 31, 0.28)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(startX - 10, iy - itemH * 0.7);
-                ctx.lineTo(startX + itemW + 10, iy - itemH * 0.7);
+                ctx.moveTo(startX - 10, rowTop(iy) - 2);
+                ctx.lineTo(startX + itemW + 10, rowTop(iy) - 2);
                 ctx.stroke();
             }
             prevKind = item.kind;
 
-            // Selection highlight
-            if (selected) {
-                ctx.fillStyle = 'rgba(204, 0, 0, 0.12)';
-                ctx.fillRect(startX - 10, iy - itemH * 0.6, itemW + 20, itemH - 4);
-                ctx.strokeStyle = '#cc0000';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(startX - 10, iy - itemH * 0.6, itemW + 20, itemH - 4);
-                ctx.fillStyle = '#cc0000';
-                ctx.font = 'bold 16px Courier New';
-                ctx.fillText('>', startX - 25, iy - itemH * 0.15);
-
-                // Touch users need an explicit tap affordance — desktop's
-                // "select with W/S, confirm with SPACE" pattern isn't obvious.
-                // Render right-aligned in the bottom of the highlighted row to
-                // stay clear of the description on the left and the cost above.
-                if (this._isTouch) {
-                    const purchasable = item.canPurchase(player);
-                    const label = purchasable ? '» TAP TO BUY' : '» SELECTED';
-                    ctx.font = 'bold 10px Courier New';
-                    ctx.fillStyle = purchasable ? '#ff2200' : '#555';
-                    ctx.textAlign = 'right';
-                    ctx.fillText(label, startX + itemW, iy + itemH * 0.18);
-                    ctx.textAlign = 'left';
-                }
-            }
-
-            // Greying logic — different per kind
             const cost = item.getCost(player);
             const canAfford = player.scrap >= cost;
             const purchasable = item.canPurchase(player);
-            const dimmed = !purchasable;
+
+            // Selection highlight
+            if (selected) {
+                panel(ctx, startX - 12, rowTop(iy), itemW + 24, rowH, {
+                    fill: 'rgba(255, 31, 31, 0.15)', stroke: COLOR.red, cut: 7, lineWidth: 1.5,
+                });
+                ctx.fillStyle = COLOR.red;
+                ctx.beginPath();
+                ctx.moveTo(startX - 28, by - nameSize * 0.72);
+                ctx.lineTo(startX - 19, by - nameSize * 0.36);
+                ctx.lineTo(startX - 28, by);
+                ctx.closePath();
+                ctx.fill();
+            }
 
             // Item name
-            ctx.font = 'bold 15px Courier New';
-            ctx.fillStyle = dimmed ? '#555' : selected ? '#ffffff' : '#999';
-            ctx.fillText(item.name, startX, iy - itemH * 0.15);
+            ctx.textAlign = 'left';
+            ctx.font = display(nameSize);
+            track(ctx, 1.5);
+            ctx.fillStyle = !purchasable ? COLOR.dim : selected ? '#ffffff' : COLOR.bone;
+            ctx.fillText(item.name, startX, by);
 
-            // Description (current → next, or current/max for consumables)
-            ctx.font = '12px Courier New';
-            ctx.fillStyle = '#555';
-            ctx.fillText(item.getDescription(player), startX, iy + itemH * 0.15);
+            // Description (current → next, or current/max for consumables).
+            // Touch users get an explicit tap affordance on the selected row —
+            // desktop's "select with W/S, confirm with SPACE" isn't obvious.
+            ctx.font = mono(textSize);
+            track(ctx, 0.5);
+            if (selected && this._isTouch) {
+                ctx.fillStyle = purchasable ? '#ff5a3c' : COLOR.dim;
+                ctx.fillText(purchasable ? '» TAP AGAIN TO BUY' : '» SELECTED', descX, by - 1);
+            } else {
+                ctx.fillStyle = selected ? COLOR.text : COLOR.dim;
+                ctx.fillText(item.getDescription(player), descX, by - 1);
+            }
 
             // Right side: pips for upgrades; cost / FREE / MAXED for the rest.
-            ctx.font = '13px Courier New';
             ctx.textAlign = 'right';
+            const right = startX + itemW;
+            const costLabel = (text, color) => {
+                ctx.fillStyle = color;
+                ctx.fillText(text, right, by - 1);
+            };
+            const priceColor = canAfford ? COLOR.amber : '#7a3a2a';
             if (item.kind === 'upgrade') {
                 const level = player.upgrades[item.id] || 0;
-                const maxed = level >= item.maxLevel;
-                // pips
-                const pipsRightEdge = startX + itemW - 70;
-                const pipX = pipsRightEdge - item.maxLevel * 14;
-                for (let l = 0; l < item.maxLevel; l++) {
-                    ctx.fillStyle = l < level ? '#cc0000' : '#333';
-                    ctx.fillText('■', pipX + l * 14, iy - itemH * 0.15);
-                }
-                if (maxed) {
-                    ctx.fillStyle = '#444';
-                    ctx.fillText('MAXED', startX + itemW, iy - itemH * 0.15);
-                } else {
-                    ctx.fillStyle = canAfford ? '#993300' : '#441111';
-                    ctx.fillText(`${cost} SCRAP`, startX + itemW, iy - itemH * 0.15);
-                }
+                const pipW = item.maxLevel * 12;
+                pips(ctx, right - 92 - pipW, by - 10, item.maxLevel, level, { cellW: 9, cellH: 10, gap: 3 });
+                if (level >= item.maxLevel) costLabel('MAXED', COLOR.dim);
+                else costLabel(`${cost} ◆`, priceColor);
             } else if (item.kind === 'consumable') {
-                if (!purchasable && cost === 0) {
-                    ctx.fillStyle = '#444';
-                    ctx.fillText('FULL', startX + itemW, iy - itemH * 0.15);
-                } else {
-                    ctx.fillStyle = canAfford ? '#993300' : '#441111';
-                    ctx.fillText(`${cost} SCRAP`, startX + itemW, iy - itemH * 0.15);
-                }
+                if (!purchasable && cost === 0) costLabel('FULL', COLOR.dim);
+                else costLabel(`${cost} ◆`, priceColor);
             } else if (item.kind === 'weapon') {
-                if (player.ownedWeapons.includes(item.weaponId)) {
-                    ctx.fillStyle = '#338833';
-                    ctx.fillText('OWNED', startX + itemW, iy - itemH * 0.15);
-                } else {
-                    ctx.fillStyle = canAfford ? '#993300' : '#441111';
-                    ctx.fillText(`${cost} SCRAP`, startX + itemW, iy - itemH * 0.15);
-                }
+                if (player.ownedWeapons.includes(item.weaponId)) costLabel('OWNED', COLOR.green);
+                else costLabel(`${cost} ◆`, priceColor);
             } else if (item.kind === 'cosmetic') {
-                ctx.fillStyle = '#666';
-                ctx.fillText('FREE', startX + itemW, iy - itemH * 0.15);
+                costLabel('FREE', COLOR.text);
             }
-            ctx.textAlign = 'left';
         }
+        track(ctx, 0);
 
         // Purchase flash
         if (this.purchaseFlash > 0) {
@@ -324,16 +307,19 @@ export class Shop {
         }
 
         // Continue button
-        const btnW = 200;
-        const btnH = 36;
+        const btnW = this._isTouch ? 280 : 220;
+        const btnH = 38;
         const btnX = (w - btnW) / 2;
         const btnY = h * 0.86;
-        ctx.fillStyle = '#cc0000';
-        ctx.fillRect(btnX, btnY, btnW, btnH);
-        ctx.font = 'bold 14px Courier New';
+        ctx.shadowColor = COLOR.red;
+        ctx.shadowBlur = 16;
+        panel(ctx, btnX, btnY, btnW, btnH, { fill: COLOR.red, stroke: null, cut: 10 });
+        ctx.shadowBlur = 0;
+        ctx.font = display(22);
+        track(ctx, 4);
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#fff';
-        ctx.fillText(this._isTouch ? 'TAP HERE TO CONTINUE →' : 'CONTINUE', w / 2, btnY + 24);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(this._isTouch ? 'TAP TO CONTINUE' : 'CONTINUE', w / 2 + 2, btnY + 27);
         // Store button bounds for touch
         this._continueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
         this._itemStartY = startY;
@@ -341,12 +327,12 @@ export class Shop {
         this._canvasH = h;
 
         // Controls hint — touch-aware
-        ctx.textAlign = 'center';
-        ctx.font = '11px Courier New';
-        ctx.fillStyle = '#444';
+        ctx.font = mono(Math.max(11, 13 * s));
+        track(ctx, 1.5);
+        ctx.fillStyle = COLOR.text;
         ctx.fillText(this._isTouch
-            ? 'TAP an item to select • TAP again to buy'
-            : 'W/S to select • SPACE to buy • ENTER to continue', w / 2, h * 0.96);
+            ? 'TAP AN ITEM TO SELECT  ·  TAP AGAIN TO BUY'
+            : 'W / S  SELECT    ·    SPACE  BUY    ·    ENTER  CONTINUE', w / 2, Math.min(h - 8, btnY + btnH + 24));
 
         ctx.restore();
     }

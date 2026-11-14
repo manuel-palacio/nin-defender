@@ -6,6 +6,9 @@ import { AssetLoader, ASSET_MANIFEST } from './utils.js';
 import { updateGameScale } from './constants.js';
 import { Game, STATE } from './game.js';
 import { PostFX } from './postfx.js';
+import { loadFonts } from './theme.js';
+import '@fontsource/bebas-neue/latin-400.css';
+import '@fontsource/share-tech-mono/latin-400.css';
 
 (function () {
     'use strict';
@@ -74,7 +77,7 @@ import { PostFX } from './postfx.js';
     }
     drawLoading();
 
-    loader.load(ASSET_MANIFEST).then(assets => {
+    Promise.all([loader.load(ASSET_MANIFEST), loadFonts()]).then(([assets]) => {
         loadingDone = true;
 
         // Count how many images actually loaded
@@ -255,7 +258,7 @@ import { PostFX } from './postfx.js';
         muteBtn.addEventListener('click', () => {
             game.audio.init();
             const muted = game.audio.toggleMute();
-            muteBtn.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+            muteBtn.classList.toggle('muted', muted);
         });
 
         // Pause button — mirrors the P/Esc keyboard shortcut so touch users
@@ -282,8 +285,20 @@ import { PostFX } from './postfx.js';
             if (dt <= 0) return;
 
             game.update(dt);
+            syncTouchControls();
             game.render();
             postfx.render({ time: timestamp / 1000, shakeMagnitude: currentShake(game.shake) });
+        }
+
+        // The joystick and fire button only exist during play, so menus and
+        // the shop are not drawn underneath them (and stay tappable).
+        let controlsShown = null;
+        function syncTouchControls() {
+            const inPlay = game.state === STATE.PLAYING || game.state === STATE.DYING ||
+                game.state === STATE.WAVE_CLEAR;
+            if (inPlay === controlsShown) return;
+            controlsShown = inPlay;
+            document.body.classList.toggle('in-play', inPlay);
         }
 
         function currentShake(shake) {

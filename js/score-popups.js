@@ -5,6 +5,8 @@
 const POP_LIFE = 0.8;
 const POP_RISE_SPEED = 45;
 
+import { display } from './theme.js';
+
 export class ScorePopups {
     constructor() {
         this.pops = [];
@@ -37,7 +39,7 @@ export class ScorePopups {
         for (const pop of this.pops) {
             const alpha = Math.min(1, pop.life / (POP_LIFE * 0.5));
             ctx.globalAlpha = alpha;
-            ctx.font = `bold ${pop.size}px Courier New`;
+            ctx.font = display(pop.size * 1.25);
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
             ctx.lineWidth = 3;
             ctx.strokeText(pop.text, pop.x, pop.y);
