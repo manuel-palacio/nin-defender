@@ -70,14 +70,21 @@ function drawNINLogo(ctx, x, y, size, style, alpha) {
     ctx.restore();
 }
 
+// Mostly white with a few hot blue and warm amber stars, as in a real field.
+const STAR_TINTS = ['#ffffff', '#ffffff', '#ffffff', '#cfe0ff', '#a9c8ff', '#ffe6c4', '#ffc9a0'];
+const STREAK_SECONDS = 0.045;
+
 class Star {
     constructor(canvas, speed, size, brightness) {
         this.canvas = canvas;
         this.speed = speed;
         this.size = size;
         this.brightness = brightness;
+        this.color = STAR_TINTS[Utils.randomInt(0, STAR_TINTS.length - 1)];
         this.twinkleSpeed = Utils.random(1, 4);
         this.twinkleOffset = Math.random() * Math.PI * 2;
+        // The biggest foreground stars get diffraction spikes.
+        this.flare = size > 1.9;
         this.respawn(true);
     }
 
@@ -88,23 +95,31 @@ class Star {
 
     update(dt) {
         this.x -= this.speed * dt;
-        if (this.x < -5) {
+        if (this.x < -30) {
             this.respawn(false);
         }
     }
 
+    // Caller owns save/restore. Fast stars smear into short streaks so the
+    // parallax layers read as speed, not just drift.
     draw(ctx, time) {
-        const twinkle = 0.5 + 0.5 * Math.sin(time * this.twinkleSpeed + this.twinkleOffset);
-        const alpha = this.brightness * twinkle;
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = this.size * 3;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        const twinkle = 0.6 + 0.4 * Math.sin(time * this.twinkleSpeed + this.twinkleOffset);
+        ctx.globalAlpha = this.brightness * twinkle;
+        ctx.fillStyle = this.color;
+        const streak = this.speed * STREAK_SECONDS;
+        if (streak > this.size * 2) {
+            ctx.fillRect(this.x, this.y - this.size * 0.5, streak, this.size);
+        } else {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        if (this.flare) {
+            const arm = this.size * (3.5 + 1.5 * twinkle);
+            ctx.globalAlpha *= 0.55;
+            ctx.fillRect(this.x - arm, this.y - 0.5, arm * 2, 1);
+            ctx.fillRect(this.x - 0.5, this.y - arm, 1, arm * 2);
+        }
     }
 }
 
@@ -983,47 +998,90 @@ export class AsteroidBelt {
 // ============================================================
 // Painted once into an offscreen canvas at reduced resolution (it's soft, so
 // upscaling is invisible) and scrolled with wrap-around, so per-frame cost is
-// two drawImage calls regardless of how many blobs make up the cloud.
-const NEBULA_RESOLUTION = 0.5;
+// two drawImage calls however detailed the cloud is.
+const NEBULA_RESOLUTION = 0.25;
+const NOISE_PERIOD = 8; // lattice cells across the strip; noise wraps on this
+
+// Value noise on a lattice that repeats horizontally every `period` cells,
+// so a texture built from it tiles seamlessly when scrolled.
+function makeTileableNoise(period) {
+    const size = 256; // must cover period × 2^(octaves − 1) lattice columns
+    const lattice = new Float32Array(size * size);
+    for (let i = 0; i < lattice.length; i++) lattice[i] = Math.random();
+    const at = (ix, iy, wrap) => lattice[(((iy % size) + size) % size) * size + (((ix % wrap) + wrap) % wrap)];
+    const fade = t => t * t * (3 - 2 * t);
+    const sample = (x, y, wrap) => {
+        const ix = Math.floor(x), iy = Math.floor(y);
+        const fx = fade(x - ix), fy = fade(y - iy);
+        const top = at(ix, iy, wrap) + (at(ix + 1, iy, wrap) - at(ix, iy, wrap)) * fx;
+        const bottom = at(ix, iy + 1, wrap) + (at(ix + 1, iy + 1, wrap) - at(ix, iy + 1, wrap)) * fx;
+        return top + (bottom - top) * fy;
+    };
+    // Fractal sum: each octave doubles the frequency (and the wrap period).
+    return (u, v, octaves, offset = 0) => {
+        let sum = 0, amp = 0.5, norm = 0, freq = 1;
+        for (let o = 0; o < octaves; o++) {
+            sum += amp * sample(u * period * freq, v * period * freq * 0.5 + offset + o * 17, period * freq);
+            norm += amp;
+            amp *= 0.5;
+            freq *= 2;
+        }
+        return sum / norm;
+    };
+}
+
+const smoothstep = (lo, hi, x) => {
+    const t = Math.max(0, Math.min(1, (x - lo) / (hi - lo)));
+    return t * t * (3 - 2 * t);
+};
 
 export class NebulaLayer {
-    constructor(width, height, { speed, blobCount, palette, alpha }) {
+    constructor(width, height, { speed, palette, alpha, coverage = 0.5, detail = 5 }) {
         this.speed = speed;
         this.alpha = alpha;
         this.offset = 0;
         this.width = width;
         this.height = height;
-        this.texture = NebulaLayer.paint(width, height, blobCount, palette);
+        this.texture = NebulaLayer.paint(width, height, palette, coverage, detail);
     }
 
-    static paint(width, height, blobCount, palette) {
+    // Fractal clouds: one noise field sets density, a second picks the hue
+    // across the palette, a third carves dark dust lanes through the gas.
+    static paint(width, height, palette, coverage, detail) {
         const texture = document.createElement('canvas');
         const w = Math.max(1, Math.round(width * NEBULA_RESOLUTION));
         const h = Math.max(1, Math.round(height * NEBULA_RESOLUTION));
         texture.width = w;
         texture.height = h;
         const ctx = texture.getContext('2d');
-        ctx.globalCompositeOperation = 'lighter';
-        for (let i = 0; i < blobCount; i++) {
-            const x = Math.random() * w;
-            const y = h * (0.5 + (Math.random() - 0.5) * Math.random() * 1.4);
-            const r = Utils.random(0.08, 0.3) * Math.max(w, h);
-            const color = palette[Utils.randomInt(0, palette.length - 1)];
-            // Draw a wrapped copy on each side so the strip tiles seamlessly.
-            for (const wrapX of [x - w, x, x + w]) {
-                NebulaLayer.paintBlob(ctx, wrapX, y, r, color);
+        const image = ctx.createImageData(w, h);
+        const noise = makeTileableNoise(NOISE_PERIOD);
+        const aspect = h / w;
+        const data = image.data;
+        for (let py = 0; py < h; py++) {
+            const v = (py / h) * aspect * 2;
+            // Thin the gas toward the top and bottom edges.
+            const band = smoothstep(0, 0.3, py / h) * smoothstep(1, 0.7, py / h);
+            for (let px = 0; px < w; px++) {
+                const u = px / w;
+                const warp = noise(u, v, 3, 90) * 0.35;
+                const density = noise(u + warp * 0.12, v + warp, detail, 0);
+                const gas = Math.pow(smoothstep(1 - coverage, 1.05, density + 0.18 * band), 1.6);
+                const dust = 1 - 0.55 * smoothstep(0.42, 0.85, noise(u, v, 3, 200));
+                const hue = noise(u, v, 2, 400) * (palette.length - 1);
+                const from = palette[Math.floor(hue)];
+                const to = palette[Math.min(palette.length - 1, Math.floor(hue) + 1)];
+                const mix = hue - Math.floor(hue);
+                const intensity = gas * dust * (0.35 + 0.65 * band);
+                const i = (py * w + px) * 4;
+                data[i]     = (from[0] + (to[0] - from[0]) * mix) * intensity;
+                data[i + 1] = (from[1] + (to[1] - from[1]) * mix) * intensity;
+                data[i + 2] = (from[2] + (to[2] - from[2]) * mix) * intensity;
+                data[i + 3] = 255;
             }
         }
+        ctx.putImageData(image, 0, 0);
         return texture;
-    }
-
-    static paintBlob(ctx, x, y, r, color) {
-        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-        grad.addColorStop(0, `rgba(${color}, 0.22)`);
-        grad.addColorStop(0.45, `rgba(${color}, 0.08)`);
-        grad.addColorStop(1, `rgba(${color}, 0)`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(x - r, y - r, r * 2, r * 2);
     }
 
     update(dt) {
@@ -1034,6 +1092,7 @@ export class NebulaLayer {
         ctx.save();
         ctx.globalAlpha = this.alpha;
         ctx.globalCompositeOperation = 'lighter';
+        ctx.imageSmoothingQuality = 'high';
         const x = -this.offset;
         ctx.drawImage(this.texture, x, 0, this.width, this.height);
         ctx.drawImage(this.texture, x + this.width, 0, this.width, this.height);
@@ -1041,9 +1100,19 @@ export class NebulaLayer {
     }
 }
 
-// RGB triplets — NIN palette: blood red, rust, bruised violet, cold steel.
-const FAR_NEBULA_PALETTE = ['140, 10, 20', '90, 20, 70', '40, 30, 90', '120, 40, 10'];
-const NEAR_NEBULA_PALETTE = ['200, 20, 20', '110, 0, 40', '60, 60, 110'];
+// RGB — NIN palette: bruised violet and cold steel far away, blood red and
+// rust in the nearer wisps.
+const FAR_NEBULA_PALETTE = [[22, 34, 96], [74, 26, 108], [126, 16, 40], [26, 58, 104]];
+const NEAR_NEBULA_PALETTE = [[210, 30, 30], [150, 20, 70], [200, 80, 20]];
+
+// Tint of the haze around each kind of celestial body.
+const ATMOSPHERE = {
+    moon: '150, 190, 220',
+    mars: '230, 110, 60',
+    gasGiant: '230, 170, 110',
+    icePlanet: '140, 200, 255',
+    ringedPlanet: '200, 170, 230',
+};
 
 export class Background {
     constructor(canvas, assets) {
@@ -1059,9 +1128,9 @@ export class Background {
     buildNebulae() {
         const { width, height } = this.canvas;
         this.farNebula = new NebulaLayer(width, height,
-            { speed: 4, blobCount: 26, palette: FAR_NEBULA_PALETTE, alpha: 0.65 });
+            { speed: 4, palette: FAR_NEBULA_PALETTE, alpha: 0.5, coverage: 0.58, detail: 5 });
         this.nearNebula = new NebulaLayer(width, height,
-            { speed: 14, blobCount: 10, palette: NEAR_NEBULA_PALETTE, alpha: 0.3 });
+            { speed: 14, palette: NEAR_NEBULA_PALETTE, alpha: 0.26, coverage: 0.46, detail: 4 });
     }
 
     buildLayers() {
@@ -1070,7 +1139,7 @@ export class Background {
         const h = this.canvas.height;
         // Layer 0: distant tiny stars (slow)
         const layer0 = [];
-        for (let i = 0; i < 80; i++) {
+        for (let i = 0; i < 150; i++) {
             layer0.push(new Star(this.canvas, Utils.random(8, 20), Utils.random(0.3, 0.8), Utils.random(0.2, 0.5)));
         }
         // Layer 1: medium stars
@@ -1090,8 +1159,13 @@ export class Background {
         // If moon asset is loaded, 30% chance to use it; otherwise pick randomly
         const bodies = ['moon', 'mars', 'gasGiant', 'icePlanet', 'ringedPlanet'];
         const pick = bodies[Utils.randomInt(0, bodies.length - 1)];
-        switch (pick) {
-            case 'moon':        return new Moon(canvas, assets);
+        const body = Background.createCelestialBody(pick, canvas, assets);
+        body.kind = pick;
+        return body;
+    }
+
+    static createCelestialBody(kind, canvas, assets) {
+        switch (kind) {
             case 'mars':        return new Mars(canvas, assets);
             case 'gasGiant':    return new GasGiant(canvas);
             case 'icePlanet':   return new IcePlanet(canvas, assets);
@@ -1133,28 +1207,85 @@ export class Background {
 
         this.farNebula.draw(ctx);
 
-        // Distant stars
+        ctx.save();
         for (const star of this.layers[0]) {
             star.draw(ctx, this.time);
         }
+        ctx.restore();
 
         // Celestial body (between distant and medium stars) — dimmed during
         // combat so enemy bullets stay readable against it.
         ctx.save();
         ctx.globalAlpha = 1 - (this.combatDim || 0);
+        this.drawAtmosphere(ctx);
         this.celestialBody.draw(ctx, this.time);
+        this.drawTerminator(ctx);
         ctx.restore();
 
         this.nearNebula.draw(ctx);
 
-        // Medium stars
+        ctx.save();
         for (const star of this.layers[1]) {
             star.draw(ctx, this.time);
         }
-
-        // Foreground stars
         for (const star of this.layers[2]) {
             star.draw(ctx, this.time);
         }
+        ctx.restore();
+    }
+
+    // Soft haze behind the body so it sits in the scene instead of on it.
+    drawAtmosphere(ctx) {
+        const body = this.celestialBody;
+        const tint = ATMOSPHERE[body.kind] || '180, 180, 220';
+        const { baseX: x, baseY: y } = body;
+        const r = body.radius * (this.bodyIsSprite() ? 1.12 : 1);
+        const halo = ctx.createRadialGradient(x, y, r * 0.9, x, y, r * 1.55);
+        halo.addColorStop(0, `rgba(${tint}, 0.3)`);
+        halo.addColorStop(0.25, `rgba(${tint}, 0.12)`);
+        halo.addColorStop(1, `rgba(${tint}, 0)`);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = halo;
+        ctx.fillRect(x - r * 1.6, y - r * 1.6, r * 3.2, r * 3.2);
+        ctx.restore();
+    }
+
+    // Day/night shading over the drawn planets: lit from the upper left, the
+    // far limb falling into shadow, with a thin bright rim on the lit edge.
+    // It also takes the flat-bright discs down a stop so they don't bloom.
+    // The moon sprite is already lit, so it is left alone.
+    drawTerminator(ctx) {
+        if (this.bodyIsSprite()) return;
+        const body = this.celestialBody;
+        const { baseX: x, baseY: y, radius: r } = body;
+        const tint = ATMOSPHERE[body.kind] || '180, 180, 220';
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip();
+        const shade = ctx.createRadialGradient(x - r * 0.5, y - r * 0.5, r * 0.2, x - r * 0.2, y - r * 0.2, r * 1.5);
+        shade.addColorStop(0, 'rgba(2, 2, 10, 0.28)');
+        shade.addColorStop(0.4, 'rgba(2, 2, 10, 0.36)');
+        shade.addColorStop(0.78, 'rgba(2, 2, 10, 0.72)');
+        shade.addColorStop(1, 'rgba(2, 2, 10, 0.92)');
+        ctx.fillStyle = shade;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+        ctx.restore();
+
+        ctx.save();
+        const rim = ctx.createLinearGradient(x - r, y - r, x + r * 0.3, y + r * 0.3);
+        rim.addColorStop(0, `rgba(${tint}, 0.85)`);
+        rim.addColorStop(1, `rgba(${tint}, 0)`);
+        ctx.strokeStyle = rim;
+        ctx.lineWidth = Math.max(1, r * 0.02);
+        ctx.beginPath();
+        ctx.arc(x, y, r - ctx.lineWidth / 2, Math.PI * 0.75, Math.PI * 1.75);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    bodyIsSprite() {
+        return this.celestialBody.kind === 'moon' && Boolean(this.assets.moon);
     }
 }
