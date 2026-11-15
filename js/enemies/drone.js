@@ -1,6 +1,7 @@
 import { Utils } from '../utils.js'
 import { GAME_SCALE } from '../constants.js'
 import { Enemy } from './enemy.js'
+import { TAU, hsl, paint, orb, light, eye } from './creature-art.js'
 
 export class Drone extends Enemy {
     constructor(canvasW, canvasH, offsetY = 0) {
@@ -35,102 +36,48 @@ export class Drone extends Enemy {
         this.y = this.baseY + Math.sin(this.time * this.wavyFreq) * this.wavyAmp;
     }
 
-    // Disembodied drifting eyeball — sclera/iris/pupil with rotating iridescent
-    // hue, dilating pupil, ruptured blood vessels, and squirming optic-nerve
-    // tendrils. wingPhase repurposed as a per-instance hue offset.
+    // Firefly — a bloodshot eye for a head, blurred wings, and a lantern
+    // abdomen that pulses on its own rhythm. Swarms in strings. Faces −X.
     draw(ctx) {
         if (!this.active) return;
         const r = this.radius;
         const t = this.pulseTime;
-        // Iris hue rotates over time for the unnerving iridescent look.
-        const irisHue = (this.wingPhase * 60 + t * 30) % 360;
-        const irisColor = `hsl(${irisHue}, 80%, 45%)`;
-        const irisRim   = `hsl(${irisHue}, 90%, 30%)`;
-        const veinAlpha = 0.3 + 0.4 * (0.5 + 0.5 * Math.sin(t * 4));
+        const pulse = 0.5 + 0.5 * Math.sin(t * 6 + this.wingPhase);
+        const lantern = hsl(this.hue, 100, 60);
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Faint outer aura — barely visible, just enough to hint motion.
-        ctx.fillStyle = `hsla(${irisHue}, 70%, 45%, 0.10)`;
-        ctx.shadowColor = irisColor;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 1.7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        light(ctx, lantern, r * 0.6, 0, r * 3.4, 0.45 + 0.4 * pulse);
 
-        // Optic nerve — 4 short squirming tendrils trailing behind (right side).
-        ctx.strokeStyle = `hsla(0, 50%, 30%, 0.7)`;
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
-        for (let i = 0; i < 4; i++) {
-            const offset = (i - 1.5) * r * 0.18;
-            const wiggle = Math.sin(t * 5 + i * 1.3) * r * 0.20;
+        // Wings beat too fast to see: two smeared, translucent blades
+        const flap = Math.sin(t * 46 + this.wingPhase);
+        for (const side of [-1, 1]) {
+            ctx.save();
+            ctx.translate(-r * 0.1, side * r * 0.25);
+            ctx.rotate(side * (0.75 + 0.45 * flap));
             ctx.beginPath();
-            ctx.moveTo(r * 0.6, offset);
-            ctx.quadraticCurveTo(
-                r * 0.95, offset + wiggle,
-                r * 1.25, offset + wiggle * 0.4
-            );
+            ctx.ellipse(r * 0.7, 0, r * 0.95, r * 0.3, 0, 0, TAU);
+            ctx.fillStyle = 'rgba(200, 235, 255, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.lineWidth = 0.7;
             ctx.stroke();
+            ctx.restore();
         }
 
-        // Sclera (white of the eye) — slightly off-white for unhealthy look.
-        ctx.fillStyle = '#e8e0d8';
+        // Lantern abdomen
+        const glow = ctx.createRadialGradient(r * 0.5, -r * 0.1, r * 0.05, r * 0.6, 0, r * 0.8);
+        glow.addColorStop(0, '#ffffff');
+        glow.addColorStop(0.4 + 0.2 * pulse, lantern);
+        glow.addColorStop(1, hsl(this.hue, 90, 24));
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.ellipse(r * 0.6, 0, r * 0.78, r * 0.52, 0, 0, TAU);
+        paint(ctx, glow, 1);
 
-        // Blood vessels — thin red lines radiating outward, pulsing alpha.
-        ctx.strokeStyle = `rgba(180, 0, 0, ${veinAlpha})`;
-        ctx.lineWidth = 0.8;
-        const veinSeed = this.wingPhase;
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2 + veinSeed;
-            const startR = r * 0.20;
-            const endR = r * 0.62;
-            const mid = (startR + endR) * 0.5;
-            const branch = Math.sin(angle * 3 + veinSeed) * r * 0.06;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(angle) * startR, Math.sin(angle) * startR);
-            ctx.quadraticCurveTo(
-                Math.cos(angle) * mid + branch, Math.sin(angle) * mid + branch,
-                Math.cos(angle) * endR, Math.sin(angle) * endR
-            );
-            ctx.stroke();
-        }
-
-        // Iris — radial gradient sclera-edge → colored iris → darker rim
-        const irisGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.42);
-        irisGrad.addColorStop(0, irisColor);
-        irisGrad.addColorStop(0.7, irisRim);
-        irisGrad.addColorStop(1, '#101010');
-        ctx.fillStyle = irisGrad;
-        ctx.shadowColor = irisColor;
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.40, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Pupil — black, dilates and contracts on its own breathing rhythm.
-        ctx.shadowBlur = 0;
-        const pupilR = r * (0.18 + 0.08 * Math.sin(t * 3));
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(0, 0, pupilR, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Catch-light specular — a tiny offset white dot that makes the eye look wet
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.beginPath();
-        ctx.arc(-r * 0.12, -r * 0.12, r * 0.05, 0, Math.PI * 2);
-        ctx.fill();
+        orb(ctx, -r * 0.2, 0, r * 0.48, r * 0.46, this.hue + 60, 35, 22, { lineWidth: 1 });
+        eye(ctx, -r * 0.72, 0, r * 0.44, { iris: '#ff3b3b', sclera: '#f3ead8', lookX: -0.7, glowAlpha: 0.35 });
 
         ctx.restore();
     }
 }
-
-// ============================================================
-// Bomber (Space Octopus) — Tentacled alien, drops ink bombs
-// ============================================================

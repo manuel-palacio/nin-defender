@@ -1,6 +1,7 @@
 import { Utils } from '../utils.js'
 import { GAME_SCALE } from '../constants.js'
 import { Enemy } from './enemy.js'
+import { volume, paint, light, eye, tentacle, fangs, horn, crack, healthBar } from './creature-art.js'
 
 export class AlienDevil extends Enemy {
     constructor(canvasW, canvasH) {
@@ -79,204 +80,69 @@ export class AlienDevil extends Enemy {
         }
     }
 
-    // Body-horror devil — keeps the original silhouette but adds a dorsal
-    // spine ridge, glowing lava cracks seeping through the skin, bone-grooved
-    // horns, drifting embers, and a face contortion (squashed eyes + jaw
-    // forward) during charging.
+    // Devil — a horned head of cracked, glowing rock with slit eyes, a
+    // furnace grin and a mane of fire that streams out when it charges.
+    // Faces the player head-on.
     draw(ctx) {
         if (!this.active) return;
         const r = this.radius;
         const t = this.time;
-        const fireFlicker = 0.7 + 0.3 * Math.sin(t * 12);
+        const heat = 0.6 + 0.4 * Math.sin(t * 7);
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Drifting ash/ember particles rising from the head — drawn first
-        // (behind everything else)
-        ctx.fillStyle = `rgba(255, 180, 80, ${0.6 * fireFlicker})`;
-        ctx.shadowColor = '#ffaa44';
-        ctx.shadowBlur = 4;
-        for (let i = 0; i < 4; i++) {
-            const phase = i * 1.7 + t * 1.4;
-            const ex = Math.sin(phase) * r * 0.35;
-            const ey = -r * 1.0 - ((phase * 0.6) % 1) * r * 0.6;
-            const er = r * (0.025 + 0.015 * Math.sin(phase * 2));
-            ctx.beginPath();
-            ctx.arc(ex, ey, er, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.shadowBlur = 0;
-
-        // Fiery aura
-        ctx.fillStyle = `rgba(255, 60, 0, ${0.15 * fireFlicker})`;
-        ctx.shadowColor = '#ff4400';
-        ctx.shadowBlur = 15 * fireFlicker;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dorsal spine ridge — 5 small triangular spines along the top of the head
-        ctx.fillStyle = '#660800';
-        ctx.strokeStyle = '#330400';
-        ctx.lineWidth = 1;
-        ctx.shadowBlur = 0;
+        // Fire streaming behind — longer and hotter mid-charge
+        const blaze = this.charging ? 2.4 : 1.2;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
         for (let i = 0; i < 5; i++) {
-            const sx = -r * 0.40 + i * r * 0.20;
-            const sh = r * (0.18 - Math.abs(i - 2) * 0.04); // taller in the middle
-            ctx.beginPath();
-            ctx.moveTo(sx - r * 0.06, -r * 0.55);
-            ctx.lineTo(sx, -r * 0.55 - sh);
-            ctx.lineTo(sx + r * 0.06, -r * 0.55);
-            ctx.closePath();
-            ctx.fill(); ctx.stroke();
+            const fan = i - 2;
+            tentacle(ctx, r * 0.2, fan * r * 0.3, fan * 0.22, r * blaze * (1 - Math.abs(fan) * 0.15),
+                r * 0.6, i % 2 ? 'rgba(255, 190, 40, 0.4)' : 'rgba(255, 80, 20, 0.45)', {
+                    t, phase: i * 2.1, wave: 0.9, speed: 13, tipWidth: 0.1, lineWidth: 0, segments: 6,
+                });
         }
-
-        // Apply a charge contortion transform to the head + face.
-        ctx.save();
-        if (this.charging) {
-            ctx.scale(1.15, 0.9);
-        }
-
-        // Horns
-        ctx.strokeStyle = '#cc2200';
-        ctx.fillStyle = '#aa1100';
-        ctx.shadowBlur = 4;
-        ctx.lineWidth = 2;
-        // Left horn
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.3, -r * 0.5);
-        ctx.quadraticCurveTo(-r * 0.6, -r * 1.3, -r * 0.15, -r * 1.1);
-        ctx.lineTo(-r * 0.2, -r * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        // Right horn
-        ctx.beginPath();
-        ctx.moveTo(r * 0.3, -r * 0.5);
-        ctx.quadraticCurveTo(r * 0.6, -r * 1.3, r * 0.15, -r * 1.1);
-        ctx.lineTo(r * 0.2, -r * 0.5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        // Bone groove lines on each horn (texture)
-        ctx.strokeStyle = 'rgba(60, 0, 0, 0.7)';
-        ctx.lineWidth = 0.6;
-        ctx.shadowBlur = 0;
-        for (const sign of [-1, 1]) {
-            for (let g = 0; g < 2; g++) {
-                const baseX = sign * r * 0.25;
-                const baseY = -r * (0.65 + g * 0.20);
-                const tipX = sign * r * 0.18;
-                const tipY = -r * (0.85 + g * 0.10);
-                ctx.beginPath();
-                ctx.moveTo(baseX, baseY);
-                ctx.lineTo(tipX, tipY);
-                ctx.stroke();
-            }
-        }
-
-        // Head body — dark red
-        const headGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.1, 0, 0, 0, r * 0.8);
-        headGrad.addColorStop(0, '#881100');
-        headGrad.addColorStop(0.7, '#550808');
-        headGrad.addColorStop(1, '#220000');
-        ctx.fillStyle = headGrad;
-        ctx.shadowColor = '#ff2200';
-        ctx.shadowBlur = 6 * fireFlicker;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.75, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Cracked-skin lava glow seeping through — 4 jagged crack lines drawn
-        // with a bright glowing stroke. The cracks pulse with fireFlicker.
-        ctx.strokeStyle = `rgba(255, 100, 0, ${fireFlicker * 0.55})`;
-        ctx.shadowColor = '#ff8800';
-        ctx.shadowBlur = 6 * fireFlicker;
-        ctx.lineWidth = 1.5;
-        const cracks = [
-            [[-r * 0.45, -r * 0.20], [-r * 0.20, -r * 0.05], [-r * 0.30, r * 0.18]],
-            [[ r * 0.40, -r * 0.18], [ r * 0.20, -r * 0.05], [ r * 0.35, r * 0.08]],
-            [[-r * 0.10,  r * 0.30], [ r * 0.05,  r * 0.20], [ r * 0.15,  r * 0.45]],
-            [[-r * 0.20,  r * 0.10], [ r * 0.00,  r * 0.05], [ r * 0.10,  r * 0.20]],
-        ];
-        for (const c of cracks) {
-            ctx.beginPath();
-            ctx.moveTo(c[0][0], c[0][1]);
-            ctx.lineTo(c[1][0], c[1][1]);
-            ctx.lineTo(c[2][0], c[2][1]);
-            ctx.stroke();
-        }
-
-        // Glowing eyes — menacing yellow-red. Squashed (more horizontal) when charging.
-        const eyeGlow = 0.7 + 0.3 * Math.sin(t * 6);
-        const eyeYScale = this.charging ? 0.5 : 1.0;
-        ctx.shadowBlur = 10 * eyeGlow;
-        ctx.fillStyle = `rgba(255, 200, 0, ${eyeGlow})`;
-        ctx.shadowColor = '#ffaa00';
-        ctx.save();
-        ctx.translate(-r * 0.25, -r * 0.15);
-        ctx.rotate(-0.2);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, r * 0.15, r * 0.08 * eyeYScale, 0, 0, Math.PI * 2);
-        ctx.fill();
         ctx.restore();
-        ctx.save();
-        ctx.translate(r * 0.2, -r * 0.15);
-        ctx.rotate(0.2);
+        light(ctx, '#ff5a1f', 0, 0, r * 2.4, 0.45 + 0.2 * heat);
+
+        for (const side of [-1, 1]) {
+            horn(ctx, side * r * 0.42, -r * 0.55, side * r * 0.95, -r * 1.45,
+                r * 0.36, side * r * 0.22, '#2a1418');
+        }
+        // Head: wide brow tapering to a pointed chin
         ctx.beginPath();
-        ctx.ellipse(0, 0, r * 0.15, r * 0.08 * eyeYScale, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        ctx.moveTo(-r * 0.82, -r * 0.35);
+        ctx.quadraticCurveTo(0, -r * 1.05, r * 0.82, -r * 0.35);
+        ctx.quadraticCurveTo(r * 0.78, r * 0.5, 0, r * 1.0);
+        ctx.quadraticCurveTo(-r * 0.78, r * 0.5, -r * 0.82, -r * 0.35);
+        ctx.closePath();
+        paint(ctx, volume(ctx, 0, -r * 0.1, r * 0.95, 4, 82, 30), 1.6);
 
-        // Mouth — jagged evil grin. Pushed forward when charging.
-        const jawForward = this.charging ? r * 0.08 : 0;
-        ctx.strokeStyle = `rgba(255, 100, 0, ${0.6 + 0.4 * fireFlicker})`;
-        ctx.lineWidth = 1.5;
-        ctx.shadowBlur = 3;
+        crack(ctx, [[-r * 0.1, -r * 0.75], [r * 0.05, -r * 0.5], [-r * 0.06, -r * 0.3]], '#ff9a1f', r * 0.07, r * 0.4);
+        crack(ctx, [[r * 0.62, 0], [r * 0.45, r * 0.2], [r * 0.5, r * 0.42]], '#ff9a1f', r * 0.06, r * 0.35);
+
+        for (const side of [-1, 1]) {
+            ctx.save();
+            ctx.translate(side * r * 0.34, -r * 0.12);
+            ctx.rotate(side * 0.5);
+            eye(ctx, 0, 0, r * 0.19, { iris: '#ffe14a', slit: true, lid: 0.5 });
+            ctx.restore();
+        }
+
+        // Maw: a black gash lit from the throat, teeth meeting across it
+        const gape = r * (0.2 + 0.1 * heat);
         ctx.beginPath();
-        ctx.moveTo(-r * 0.35, r * 0.2 + jawForward);
-        for (let i = 0; i < 5; i++) {
-            const mx = -r * 0.35 + (i + 0.5) * (r * 0.7 / 5);
-            const my = r * 0.2 + jawForward + (i % 2 === 0 ? r * 0.15 : 0);
-            ctx.lineTo(mx, my);
-        }
-        ctx.lineTo(r * 0.35, r * 0.2 + jawForward);
-        ctx.stroke();
+        ctx.moveTo(-r * 0.5, r * 0.26);
+        ctx.quadraticCurveTo(0, r * 0.4, r * 0.5, r * 0.26);
+        ctx.quadraticCurveTo(0, r * 0.4 + gape * 2.2, -r * 0.5, r * 0.26);
+        ctx.closePath();
+        paint(ctx, '#160406', 1.2);
+        light(ctx, '#ff8a1f', 0, r * 0.5 + gape * 0.5, r * 0.55, 0.9);
+        fangs(ctx, -r * 0.42, r * 0.3, r * 0.42, r * 0.3, 7, r * 0.17, 0, 1, '#f1e2c4');
+        fangs(ctx, -r * 0.26, r * 0.42 + gape * 1.25, r * 0.26, r * 0.42 + gape * 1.25, 4, r * 0.15, 0, -1, '#f1e2c4');
 
-        ctx.restore(); // end charge-contortion transform
-
-        // Flame trail when charging (drawn outside the contortion so it
-        // doesn't get squashed)
-        if (this.charging) {
-            ctx.fillStyle = `rgba(255, 80, 0, ${0.5 * fireFlicker})`;
-            ctx.shadowColor = '#ff4400';
-            ctx.shadowBlur = 12;
-            ctx.beginPath();
-            ctx.moveTo(r * 0.6, -r * 0.2);
-            ctx.lineTo(r * 1.5 + Math.random() * r * 0.5, 0);
-            ctx.lineTo(r * 0.6, r * 0.2);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-        // Health bar
-        if (this.hp < this.maxHp) {
-            const barW = r * 1.5;
-            const barH = 3;
-            const frac = this.hp / this.maxHp;
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-barW / 2, -r * 1.2 - 10, barW, barH);
-            ctx.fillStyle = frac > 0.5 ? '#00ff66' : '#ff3366';
-            ctx.fillRect(-barW / 2, -r * 1.2 - 10, barW * frac, barH);
-        }
-
+        healthBar(ctx, r, this.hp, this.maxHp);
         ctx.restore();
     }
 }
-
-// ============================================================
-// Boss — Large, multi-phase boss with cycling attack patterns
-// ============================================================
-// Themed names per bossType (0-9), used by HUD preview at phase transition.

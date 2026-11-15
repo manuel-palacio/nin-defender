@@ -1,6 +1,7 @@
 import { Utils } from '../utils.js'
 import { GAME_SCALE } from '../constants.js'
 import { Enemy } from './enemy.js'
+import { TAU, volume, paint, rim, light, eye, tentacle, fangs, healthBar } from './creature-art.js'
 
 export class AlienGhost extends Enemy {
     constructor(canvasW, canvasH) {
@@ -47,177 +48,80 @@ export class AlienGhost extends Enemy {
         }
     }
 
-    // Screaming skull specter — angular skull with hollow blue-fire eye
-    // sockets, an unhinging jaw, and a multi-ribbon ectoplasm shroud
-    // billowing behind. Teleport flash multiplies the skull into 3
-    // overlapping copies that converge.
+    // Skull specter — a bone-white skull with cold fire in its sockets and
+    // a jaw that drops open as it wails, dragging a shroud of ectoplasm.
+    // On teleport it arrives as three skulls that snap together. Faces −X.
     draw(ctx) {
         if (!this.active) return;
         const r = this.radius;
         const t = this.time;
-        const alphaBase = 0.45 + 0.25 * Math.sin(t * 2);
-        const drawSkull = (offsetX, offsetY, alpha) => {
-            ctx.save();
-            ctx.translate(offsetX, offsetY);
-            ctx.globalAlpha = alpha;
+        const flash = Math.max(0, this.teleportFlash) / 0.3;
+        const wail = 0.5 + 0.5 * Math.sin(t * 4.5);
 
-            // Cranium — irregular 8-point polygon with sin perturbation for the bumpy bone look
-            ctx.fillStyle = 'rgba(220, 220, 215, 0.92)';
-            ctx.shadowColor = '#88ccff';
-            ctx.shadowBlur = 6;
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        // Shroud: translucent ribbons streaming behind
+        for (let i = 0; i < 5; i++) {
+            const fan = i - 2;
+            tentacle(ctx, r * 0.15, fan * r * 0.28, fan * 0.16, r * (1.9 - Math.abs(fan) * 0.25),
+                r * 0.55, `rgba(170, 110, 255, ${0.3 - Math.abs(fan) * 0.04})`, {
+                    t, phase: i * 1.3, wave: 0.7, speed: 4, tipWidth: 0.2, lineWidth: 0,
+                });
+        }
+        light(ctx, '#a66bff', 0, 0, r * 2.2, 0.4);
+
+        const skull = (ox, oy, alpha) => {
+            ctx.save();
+            ctx.translate(ox, oy);
+            ctx.globalAlpha = alpha;
+            // Jaw, hinged behind the cheek
+            const drop = r * (0.12 + 0.3 * wail + 0.3 * flash);
             ctx.beginPath();
-            const pts = 10;
-            for (let i = 0; i < pts; i++) {
-                const a = -Math.PI + (i / (pts - 1)) * Math.PI;
-                const wob = 0.94 + 0.06 * Math.sin(a * 5 + t);
-                const px = Math.cos(a) * r * 0.7 * wob;
-                const py = Math.sin(a) * r * 0.55 * wob - r * 0.15;
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
+            ctx.roundRect(-r * 0.62, r * 0.18 + drop, r * 0.78, r * 0.34, r * 0.12);
+            paint(ctx, volume(ctx, -r * 0.25, r * 0.3 + drop, r * 0.5, 265, 22, 52), 1.2);
+            fangs(ctx, -r * 0.56, r * 0.2 + drop, r * 0.08, r * 0.2 + drop, 5, r * 0.13, 0, -1);
+            // Cranium
+            ctx.beginPath();
+            ctx.ellipse(-r * 0.05, -r * 0.18, r * 0.78, r * 0.7, 0, 0, TAU);
+            paint(ctx, volume(ctx, -r * 0.05, -r * 0.18, r * 0.78, 265, 22, 62), 1.4);
+            rim(ctx, -r * 0.05, -r * 0.18, r * 0.78, r * 0.7, 'rgba(255, 255, 255, 0.8)', r * 0.06);
+            fangs(ctx, -r * 0.58, r * 0.4, r * 0.1, r * 0.4, 5, r * 0.14, 0, 1);
+            // Fracture across the brow
+            ctx.strokeStyle = 'rgba(40, 14, 60, 0.85)';
+            ctx.lineWidth = Math.max(0.8, r * 0.04);
+            ctx.beginPath();
+            ctx.moveTo(r * 0.12, -r * 0.86);
+            ctx.lineTo(r * 0.02, -r * 0.62);
+            ctx.lineTo(r * 0.2, -r * 0.5);
+            ctx.lineTo(r * 0.14, -r * 0.36);
+            ctx.stroke();
+            // Sockets slanted into a scowl, a point of cold fire deep in each
+            for (const [sx, tilt] of [[-0.42, 0.55], [0.1, -0.55]]) {
+                ctx.beginPath();
+                ctx.ellipse(sx * r, -r * 0.12, r * 0.24, r * 0.17, tilt, 0, TAU);
+                ctx.fillStyle = '#0d0418';
+                ctx.fill();
+                eye(ctx, sx * r, -r * 0.1, r * (0.07 + 0.03 * wail), { iris: '#7fdcff', pupil: '#eaffff' });
             }
+            ctx.fillStyle = '#12061f';
+            ctx.beginPath();
+            ctx.moveTo(-r * 0.2, r * 0.1);
+            ctx.lineTo(-r * 0.12, r * 0.28);
+            ctx.lineTo(-r * 0.28, r * 0.28);
             ctx.closePath();
             ctx.fill();
-
-            // Cheekbones — two protruding triangles below the cranium edges
-            ctx.beginPath();
-            ctx.moveTo(-r * 0.55, r * 0.05);
-            ctx.lineTo(-r * 0.40, r * 0.20);
-            ctx.lineTo(-r * 0.30, r * 0.05);
-            ctx.closePath(); ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(r * 0.55, r * 0.05);
-            ctx.lineTo(r * 0.40, r * 0.20);
-            ctx.lineTo(r * 0.30, r * 0.05);
-            ctx.closePath(); ctx.fill();
-
-            // Lower jaw — drops open with sin(time * 2). Drawn as a separate piece.
-            ctx.shadowBlur = 0;
-            const jawDrop = (Math.sin(t * 2) + 1) * 0.5; // 0..1
-            const jawY = r * 0.20 + jawDrop * r * 0.18;
-            ctx.fillStyle = 'rgba(220, 220, 215, 0.92)';
-            ctx.beginPath();
-            ctx.ellipse(0, jawY, r * 0.34, r * 0.16, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Hollow eye sockets — dark holes with cold-blue inner glow
-            ctx.fillStyle = '#020812';
-            ctx.beginPath();
-            ctx.ellipse(-r * 0.22, -r * 0.18, r * 0.14, r * 0.18, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(r * 0.22, -r * 0.18, r * 0.14, r * 0.18, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Cold-blue inner glow
-            const glow = ctx.createRadialGradient(-r * 0.22, -r * 0.18, 0, -r * 0.22, -r * 0.18, r * 0.14);
-            glow.addColorStop(0, 'rgba(0, 150, 255, 0.85)');
-            glow.addColorStop(1, 'rgba(0, 150, 255, 0)');
-            ctx.fillStyle = glow;
-            ctx.beginPath();
-            ctx.ellipse(-r * 0.22, -r * 0.18, r * 0.10, r * 0.13, 0, 0, Math.PI * 2);
-            ctx.fill();
-            const glow2 = ctx.createRadialGradient(r * 0.22, -r * 0.18, 0, r * 0.22, -r * 0.18, r * 0.14);
-            glow2.addColorStop(0, 'rgba(0, 150, 255, 0.85)');
-            glow2.addColorStop(1, 'rgba(0, 150, 255, 0)');
-            ctx.fillStyle = glow2;
-            ctx.beginPath();
-            ctx.ellipse(r * 0.22, -r * 0.18, r * 0.10, r * 0.13, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Open mouth — O-shape with teeth visible. Width tracks the jaw drop.
-            const mouthW = r * 0.20;
-            const mouthH = r * 0.10 + jawDrop * r * 0.12;
-            ctx.fillStyle = '#000';
-            ctx.beginPath();
-            ctx.ellipse(0, jawY, mouthW, mouthH, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Teeth (5 top + 5 bottom) — bone color
-            ctx.fillStyle = '#cccfc4';
-            for (let i = 0; i < 5; i++) {
-                const tx = -mouthW + (i + 0.5) * (mouthW * 2 / 5);
-                ctx.beginPath();
-                ctx.moveTo(tx, jawY - mouthH);
-                ctx.lineTo(tx + r * 0.020, jawY - mouthH + r * 0.04);
-                ctx.lineTo(tx - r * 0.020, jawY - mouthH + r * 0.04);
-                ctx.closePath(); ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(tx, jawY + mouthH);
-                ctx.lineTo(tx + r * 0.020, jawY + mouthH - r * 0.04);
-                ctx.lineTo(tx - r * 0.020, jawY + mouthH - r * 0.04);
-                ctx.closePath(); ctx.fill();
-            }
-
-            // Nasal cavity — small inverted triangle above the mouth
-            ctx.fillStyle = '#0a0410';
-            ctx.beginPath();
-            ctx.moveTo(0, -r * 0.02);
-            ctx.lineTo(-r * 0.05, r * 0.10);
-            ctx.lineTo(r * 0.05, r * 0.10);
-            ctx.closePath(); ctx.fill();
-
             ctx.restore();
         };
 
-        // Teleport flash → 3 overlapping skulls converging on the center
-        if (this.teleportFlash > 0) {
-            ctx.save();
-            ctx.translate(this.x, this.y);
-            ctx.fillStyle = `rgba(80, 150, 255, ${this.teleportFlash * 0.6})`;
-            ctx.shadowColor = '#66aaff';
-            ctx.shadowBlur = 18;
-            ctx.beginPath();
-            ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-            // 3 echoes converging
-            const conv = 1 - this.teleportFlash / 0.3;
-            const echoR = r * (1 - conv) * 0.5;
-            drawSkull(this.x - echoR, this.y, alphaBase * 0.45);
-            drawSkull(this.x + echoR, this.y - echoR * 0.5, alphaBase * 0.45);
+        const presence = 0.8 + 0.15 * Math.sin(t * 2);
+        if (flash > 0) {
+            skull(-r * 1.4 * flash, -r * 0.5 * flash, 0.4);
+            skull(r * 1.4 * flash, r * 0.5 * flash, 0.4);
         }
+        skull(0, 0, presence);
 
-        // Ectoplasm shroud — 5 ribbons trailing behind, each with own phase
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.globalAlpha = alphaBase * 0.55;
-        ctx.fillStyle = '#7a9bff';
-        ctx.shadowColor = '#88aaff';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-            const phase = i * 0.7 + t * 2.3;
-            const tailY = (i - 2) * r * 0.18;
-            const billow = Math.sin(phase) * r * 0.18;
-            const tailLen = r * (0.6 + 0.3 * Math.sin(t * 1.7 + i));
-            ctx.moveTo(r * 0.30, tailY - r * 0.05);
-            ctx.quadraticCurveTo(r * 0.55 + billow, tailY + r * 0.10, r * 0.30 + tailLen, tailY + billow);
-            ctx.quadraticCurveTo(r * 0.55 + billow, tailY - r * 0.10, r * 0.30, tailY + r * 0.05);
-        }
-        ctx.fill();
-        ctx.restore();
-
-        // Main skull
-        drawSkull(this.x, this.y, alphaBase + 0.25);
-
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.globalAlpha = 1;
-
-        // Health bar
-        if (this.hp < this.maxHp) {
-            const barW = r * 1.5;
-            const barH = 3;
-            const frac = this.hp / this.maxHp;
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-barW / 2, -r - 10, barW, barH);
-            ctx.fillStyle = frac > 0.5 ? '#00ff66' : '#ff3366';
-            ctx.fillRect(-barW / 2, -r - 10, barW * frac, barH);
-        }
-
+        healthBar(ctx, r, this.hp, this.maxHp);
         ctx.restore();
     }
 }
-
-// ============================================================
-// AlienDevil — Fiery, aggressive, charges at player
-// ============================================================

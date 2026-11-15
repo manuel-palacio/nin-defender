@@ -1,6 +1,7 @@
 import { Utils } from '../utils.js'
 import { GAME_SCALE } from '../constants.js'
 import { Enemy } from './enemy.js'
+import { TAU, hsl, volume, paint, orb, rim, eye, spine, ribbon, healthBar } from './creature-art.js'
 
 export class Bomber extends Enemy {
     constructor(canvasW, canvasH) {
@@ -58,157 +59,70 @@ export class Bomber extends Enemy {
         if (audio) audio.playEnemyLaser();
     }
 
-    // Gore octopus — torn-edged mantle, exposed clacking beak, one cloudy
-    // dead eye, ink stains across the body, hooked sucker tips.
+    // Gore octopus — a mottled violet mantle, one live eye with a barred
+    // pupil and one milky dead one, a clacking beak, and six sucker-lined
+    // arms coiling beneath. Faces −X.
     draw(ctx) {
         if (!this.active) return;
         const r = this.radius;
         const t = this.time;
+        const hue = 282;
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // Tentacles with hooked sucker tips
-        ctx.lineCap = 'round';
         for (let i = 0; i < this.tentacleCount; i++) {
-            const angle = (i / this.tentacleCount) * Math.PI * 1.4 + Math.PI * 0.3;
-            const wave1 = Math.sin(t * 3 + i * 1.2) * 0.3;
-            const wave2 = Math.sin(t * 2.5 + i * 0.8) * 0.2;
-            const startX = Math.cos(angle) * r * 0.5;
-            const startY = Math.sin(angle) * r * 0.5;
-            const midX = Math.cos(angle + wave1) * r * 1.1;
-            const midY = Math.sin(angle + wave1) * r * 1.1;
-            const endX = Math.cos(angle + wave1 + wave2) * r * 1.6;
-            const endY = Math.sin(angle + wave1 + wave2) * r * 1.4;
-
-            ctx.strokeStyle = `hsla(275, 50%, ${30 + i * 3}%, 0.85)`;
-            ctx.lineWidth = 3.5 - i * 0.3;
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.quadraticCurveTo(midX, midY, endX, endY);
-            ctx.stroke();
-
-            // Hooked sucker at tip — small inward arc
-            ctx.strokeStyle = '#220033';
-            ctx.lineWidth = 1.5;
-            const hookAngle = Math.atan2(endY - midY, endX - midX);
-            ctx.beginPath();
-            ctx.arc(endX, endY, r * 0.06, hookAngle - 0.5, hookAngle + Math.PI * 0.6);
-            ctx.stroke();
+            const fan = i / (this.tentacleCount - 1) - 0.5;
+            const points = spine(fan * r * 1.0, r * 0.25, Math.PI / 2 + fan * 1.3, r * 1.25, {
+                t, phase: i * 1.1, wave: 0.7, speed: 2.6, curl: fan * 1.6, segments: 8,
+            });
+            ribbon(ctx, points, r * 0.3, hsl(hue, 55, 30 + (i % 2) * 6), { highlight: hsl(hue, 70, 62, 0.7) });
+            ctx.fillStyle = hsl(hue + 30, 60, 78, 0.85);
+            for (let s = 2; s < points.length - 1; s += 2) {
+                ctx.beginPath();
+                ctx.arc(points[s].x, points[s].y, r * 0.045, 0, TAU);
+                ctx.fill();
+            }
         }
 
-        // Mantle — irregular torn-edge polygon (8-point with sin perturbation)
-        const mantleGrad = ctx.createRadialGradient(-r * 0.1, -r * 0.15, 0, 0, 0, r * 0.7);
-        mantleGrad.addColorStop(0, '#9944cc');
-        mantleGrad.addColorStop(0.5, '#5e1a88');
-        mantleGrad.addColorStop(1, '#2a0a44');
-        ctx.fillStyle = mantleGrad;
-        ctx.shadowColor = '#aa44ff';
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        const N = 14;
-        for (let i = 0; i < N; i++) {
-            const a = (i / N) * Math.PI * 2 - Math.PI * 0.5;
-            const tear = 0.85 + 0.15 * Math.sin(a * 5 + t * 0.7) - Math.abs(Math.sin(a * 4 + i)) * 0.1;
-            const rx = Math.cos(a) * r * 0.65 * tear;
-            const ry = Math.sin(a) * r * 0.55 * tear - r * 0.1;
-            if (i === 0) ctx.moveTo(rx, ry);
-            else ctx.lineTo(rx, ry);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // Ink stains — irregular dark splotches on the body surface
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(15, 0, 25, 0.55)';
-        const stains = [
-            { x: -r * 0.30, y: -r * 0.10, w: r * 0.13, h: r * 0.09 },
-            { x:  r * 0.10, y: -r * 0.30, w: r * 0.10, h: r * 0.07 },
-            { x:  r * 0.25, y:  r * 0.08, w: r * 0.08, h: r * 0.06 },
-            { x: -r * 0.05, y:  r * 0.15, w: r * 0.11, h: r * 0.05 },
-        ];
-        for (const s of stains) {
+        // Mantle
+        const breathe = 1 + 0.04 * Math.sin(t * 2.2);
+        orb(ctx, r * 0.08, -r * 0.2, r * 0.86 * breathe, r * 0.74 / breathe, hue, 58, 40);
+        ctx.fillStyle = hsl(hue, 60, 20, 0.5);
+        for (const [sx, sy, sr] of [[0.45, -0.5, 0.13], [0.6, -0.1, 0.09], [0.15, -0.62, 0.08], [-0.3, -0.55, 0.1]]) {
             ctx.beginPath();
-            ctx.ellipse(s.x, s.y, s.w, s.h, Math.sin(t + s.x) * 0.4, 0, Math.PI * 2);
+            ctx.arc(sx * r, sy * r, sr * r, 0, TAU);
             ctx.fill();
         }
+        rim(ctx, r * 0.08, -r * 0.2, r * 0.86, r * 0.74, 'rgba(255, 220, 255, 0.65)', r * 0.05);
 
-        // Eyes — one normal, one cloudy/dead. The dead one is on the left.
-        ctx.fillStyle = '#222';
-        ctx.beginPath(); // socket shadow
-        ctx.ellipse(-r * 0.22, -r * 0.05, r * 0.18, r * 0.13, -0.1, 0, Math.PI * 2);
-        ctx.fill();
+        // Live eye, dead eye, beak
+        eye(ctx, -r * 0.4, -r * 0.02, r * 0.2, { iris: '#ffd23b', sclera: '#f5e9c8', lookX: -0.5, lid: 0.3 });
+        ctx.fillStyle = '#050208';
+        ctx.fillRect(-r * 0.5, -r * 0.045, r * 0.16, r * 0.05);
         ctx.beginPath();
-        ctx.ellipse(r * 0.18, -r * 0.05, r * 0.18, r * 0.13, 0.1, 0, Math.PI * 2);
-        ctx.fill();
-
-        // LEFT eye — cloudy/dead (light grey-blue, no clear pupil)
-        ctx.fillStyle = 'rgba(200, 200, 220, 0.92)';
-        ctx.beginPath();
-        ctx.ellipse(-r * 0.22, -r * 0.05, r * 0.14, r * 0.10, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-        // Faint cataract streak
-        ctx.fillStyle = 'rgba(230, 230, 240, 0.5)';
-        ctx.beginPath();
-        ctx.ellipse(-r * 0.22, -r * 0.06, r * 0.10, r * 0.04, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // RIGHT eye — alive, dilated pupil
-        ctx.fillStyle = '#eeddff';
-        ctx.beginPath();
-        ctx.ellipse(r * 0.18, -r * 0.05, r * 0.14, r * 0.10, 0.1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#110022';
-        ctx.beginPath();
-        ctx.ellipse(r * 0.18, -r * 0.03, r * 0.05, r * 0.08, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Beak — two chitinous triangular pieces clacking together at the mouth
-        const clack = Math.sin(t * 6) * 0.18;
-        ctx.fillStyle = '#0a0010';
-        ctx.strokeStyle = '#332244';
-        ctx.lineWidth = 1;
-        const beakBaseX = 0;
-        const beakBaseY = r * 0.18;
-        // Upper beak
-        ctx.save();
-        ctx.translate(beakBaseX, beakBaseY);
-        ctx.rotate(clack);
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.10, 0);
-        ctx.lineTo(0, r * 0.13);
-        ctx.lineTo(r * 0.04, 0.0);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        ctx.restore();
-        // Lower beak
-        ctx.save();
-        ctx.translate(beakBaseX, beakBaseY);
-        ctx.rotate(-clack);
-        ctx.beginPath();
-        ctx.moveTo(r * 0.10, 0);
-        ctx.lineTo(0, r * 0.13);
-        ctx.lineTo(-r * 0.04, 0);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
-        ctx.restore();
-
-        // Health bar
-        if (this.hp < this.maxHp) {
-            const barW = r * 1.5;
-            const barH = 3;
-            const frac = this.hp / this.maxHp;
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = '#333';
-            ctx.fillRect(-barW / 2, -r - 10, barW, barH);
-            ctx.fillStyle = frac > 0.5 ? '#00ff66' : '#ff3366';
-            ctx.fillRect(-barW / 2, -r - 10, barW * frac, barH);
+        ctx.arc(r * 0.16, r * 0.02, r * 0.17, 0, TAU);
+        paint(ctx, volume(ctx, r * 0.16, r * 0.02, r * 0.17, 260, 12, 70), 1.2);
+        // Old wound raked across the dead eye
+        ctx.strokeStyle = 'rgba(110, 16, 36, 0.9)';
+        ctx.lineWidth = Math.max(1, r * 0.05);
+        ctx.lineCap = 'round';
+        for (const off of [-0.07, 0.05]) {
+            ctx.beginPath();
+            ctx.moveTo(r * (0.0 + off), -r * 0.2);
+            ctx.lineTo(r * (0.28 + off), r * 0.24);
+            ctx.stroke();
         }
+        const clack = r * 0.05 * (0.5 + 0.5 * Math.sin(t * 7));
+        ctx.fillStyle = '#1a0d12';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.24, r * 0.3);
+        ctx.lineTo(-r * 0.02, r * 0.3);
+        ctx.lineTo(-r * 0.13, r * 0.5 + clack);
+        ctx.closePath();
+        ctx.fill();
 
+        healthBar(ctx, r, this.hp, this.maxHp);
         ctx.restore();
     }
 }
-
-// ============================================================
-// SpaceMine (Space Jellyfish) — Drifts, stings on proximity
-// ============================================================

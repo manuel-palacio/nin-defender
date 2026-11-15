@@ -1,6 +1,7 @@
 import { Utils } from '../utils.js'
 import { GAME_SCALE } from '../constants.js'
 import { Enemy } from './enemy.js'
+import { hsl, paint, rim, light, eye, tentacle } from './creature-art.js'
 
 export class SpaceMine extends Enemy {
     constructor(canvasW, canvasH) {
@@ -59,120 +60,53 @@ export class SpaceMine extends Enemy {
         this.active = false;
     }
 
-    // Severed alien hand — fleshy palm, 6-8 fingers with knuckled joints,
-    // bone-spike fingertips, glowing sigil eye in the palm. Drifts palm-first
-    // toward the player; on detonate the fingers snap inward.
+    // Jellyfish — a translucent bell with a slit eye suspended inside it,
+    // trailing stinging tentacles tipped with light. Drifts, then bursts
+    // into a ring of stingers when the player comes close.
     draw(ctx) {
         if (!this.active) return;
         const r = this.radius;
         const t = this.time;
-        const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+        const hue = this.hue;
+        const squeeze = Math.sin(t * 3);
+        const bellW = r * (1.02 - 0.08 * squeeze);
+        const bellH = r * (1.0 + 0.1 * squeeze);
+        const hemY = r * 0.12;
 
         ctx.save();
         ctx.translate(this.x, this.y);
 
-        // 6-8 fingers, each with 2 knuckle joints and a bone-spike tip.
-        // Independent sin phases so they twitch out of sync. Fingers point
-        // mostly forward (-X), splayed across an arc.
-        const fingerCount = this.tentacleCount;
-        const fleshDark  = 'hsl(130, 25%, 18%)';
-        const fleshMid   = 'hsl(130, 22%, 28%)';
-        ctx.lineCap = 'round';
-        for (let i = 0; i < fingerCount; i++) {
-            const splay = ((i / (fingerCount - 1)) - 0.5) * Math.PI * 1.0;
-            const baseAngle = Math.PI + splay; // forward = -X
-            const phase = i * 1.4 + t * 1.5;
-            const twitch = Math.sin(phase) * 0.15;
-            const lengthMul = 1.0 + 0.3 * Math.sin(t * 0.7 + i);
-
-            // Bone segment 1 (palm → knuckle)
-            const seg1 = r * 0.7 * lengthMul;
-            const k1x = Math.cos(baseAngle + twitch) * seg1;
-            const k1y = Math.sin(baseAngle + twitch) * seg1;
-
-            // Bone segment 2 (knuckle → next knuckle)
-            const seg2 = r * 0.5 * lengthMul;
-            const k2x = k1x + Math.cos(baseAngle + twitch * 1.5 + 0.2) * seg2;
-            const k2y = k1y + Math.sin(baseAngle + twitch * 1.5 + 0.2) * seg2;
-
-            // Tip
-            const seg3 = r * 0.35 * lengthMul;
-            const tipX = k2x + Math.cos(baseAngle + twitch * 2.0) * seg3;
-            const tipY = k2y + Math.sin(baseAngle + twitch * 2.0) * seg3;
-
-            // Finger shaft
-            ctx.strokeStyle = fleshDark;
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(k1x, k1y);
-            ctx.lineTo(k2x, k2y);
-            ctx.lineTo(tipX, tipY);
-            ctx.stroke();
-
-            // Knuckle nodes
-            ctx.fillStyle = fleshMid;
-            ctx.beginPath(); ctx.arc(k1x, k1y, 2.5, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(k2x, k2y, 2.0, 0, Math.PI * 2); ctx.fill();
-
-            // Bone-spike tip — small triangle pointing outward
-            ctx.fillStyle = '#bfbfa8';
-            const tipAngle = Math.atan2(tipY - k2y, tipX - k2x);
-            const spikeLen = r * 0.10;
-            ctx.beginPath();
-            ctx.moveTo(tipX + Math.cos(tipAngle) * spikeLen, tipY + Math.sin(tipAngle) * spikeLen);
-            ctx.lineTo(tipX + Math.cos(tipAngle + 1.6) * 1.5, tipY + Math.sin(tipAngle + 1.6) * 1.5);
-            ctx.lineTo(tipX + Math.cos(tipAngle - 1.6) * 1.5, tipY + Math.sin(tipAngle - 1.6) * 1.5);
-            ctx.closePath();
-            ctx.fill();
+        for (let i = 0; i < this.tentacleCount; i++) {
+            const across = this.tentacleCount === 1 ? 0 : i / (this.tentacleCount - 1) - 0.5;
+            const tip = tentacle(ctx, across * bellW * 1.5, hemY, Math.PI / 2 + across * 0.5,
+                r * (1.25 + 0.45 * (i % 2)), r * 0.17, hsl(hue, 75, 62, 0.75), {
+                    t, phase: i * 1.7, wave: 0.6, speed: 3, segments: 7,
+                    lineWidth: 0.8, stroke: hsl(hue, 80, 18, 0.7),
+                });
+            light(ctx, '#ffb3ee', tip.x, tip.y, r * 0.32, 0.9);
         }
 
-        // Palm — irregular fleshy oval with subtle shadow
-        const palmGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.7);
-        palmGrad.addColorStop(0, fleshMid);
-        palmGrad.addColorStop(0.7, fleshDark);
-        palmGrad.addColorStop(1, '#0e1812');
-        ctx.fillStyle = palmGrad;
-        ctx.shadowColor = '#000';
-        ctx.shadowBlur = 4;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, r * 0.65, r * 0.55, 0, 0, Math.PI * 2);
-        ctx.fill();
+        light(ctx, hsl(hue, 100, 65), 0, -r * 0.2, r * 1.9, 0.45);
 
-        // Sigil eye in the palm — glowing detonation warning
-        ctx.shadowBlur = 0;
-        const sigilColor = `rgba(180, 255, 120, ${0.35 + 0.4 * pulse})`;
-        ctx.fillStyle = sigilColor;
-        ctx.shadowColor = '#88ff44';
-        ctx.shadowBlur = 8 * pulse;
+        // Bell: dome above, scalloped hem below
+        const scallops = 5;
         ctx.beginPath();
-        ctx.ellipse(0, 0, r * 0.18, r * 0.10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Inner pupil
-        ctx.fillStyle = '#0a1a04';
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.05, 0, Math.PI * 2);
-        ctx.fill();
-        // Sigil radial ticks (4 short lines around the eye)
-        ctx.strokeStyle = `rgba(180, 255, 120, ${0.4 + 0.3 * pulse})`;
-        ctx.lineWidth = 1;
-        for (let s = 0; s < 4; s++) {
-            const a = (s / 4) * Math.PI * 2;
-            const ix = Math.cos(a) * r * 0.22;
-            const iy = Math.sin(a) * r * 0.13;
-            const ox = Math.cos(a) * r * 0.32;
-            const oy = Math.sin(a) * r * 0.20;
-            ctx.beginPath();
-            ctx.moveTo(ix, iy);
-            ctx.lineTo(ox, oy);
-            ctx.stroke();
+        ctx.ellipse(0, hemY, bellW, bellH, 0, Math.PI, 0);
+        for (let i = 0; i < scallops; i++) {
+            const from = bellW - (i / scallops) * bellW * 2;
+            const to = bellW - ((i + 1) / scallops) * bellW * 2;
+            ctx.quadraticCurveTo((from + to) / 2, hemY + r * 0.3, to, hemY);
         }
+        ctx.closePath();
+        const membrane = ctx.createRadialGradient(-bellW * 0.35, -bellH * 0.6, r * 0.05, 0, -r * 0.1, r * 1.25);
+        membrane.addColorStop(0, hsl(hue, 90, 88, 0.92));
+        membrane.addColorStop(0.45, hsl(hue, 80, 58, 0.72));
+        membrane.addColorStop(1, hsl(hue, 85, 26, 0.8));
+        paint(ctx, membrane, 1.2, hsl(hue, 80, 16, 0.9));
+        rim(ctx, 0, hemY, bellW, bellH, 'rgba(255, 255, 255, 0.7)', r * 0.07);
+
+        eye(ctx, 0, -r * 0.3, r * 0.34, { iris: '#fff06b', slit: true, lookX: -0.6 });
 
         ctx.restore();
     }
 }
-
-// ============================================================
-// StealthFighter (Space Chameleon) — Color-shifting lizard alien
-// ============================================================
