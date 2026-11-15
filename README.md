@@ -27,30 +27,32 @@ Type during gameplay: `HURT` for god mode, `CLOSER` to spawn the final boss.
 ## Features
 
 ### Enemies
-9 creature-themed enemy types with unique behaviors and canvas-drawn visuals:
+Canvas-drawn creatures, one per phase, each a lit volume with glowing eyes and tapered limbs:
 - **Asteroids** — textured with craters and ridges, split into fragments on destruction
-- **Alien Critters** — bug-like creatures with antennae, segmented body, scuttling legs
-- **Space Fireflies** — bioluminescent swarm insects with fluttering wings
-- **Space Jellyfish** — translucent bell domes with flowing tentacles, sting on proximity
-- **Spider Drones** — animated legs, mandibles, multiple eyes, shoot web projectiles
-- **Alien Ghosts** — translucent, teleport to new positions
-- **Space Octopus** — tentacled aliens that drop ink bombs
-- **Space Chameleons** — color-shifting lizards that cloak in/out of visibility
-- **Alien Devils** — fiery with horns, charge at player, shoot fireballs
+- **Critters** — armoured bugs with snapping mandibles and scuttling legs; the violet brood-carrier is the tougher tier
+- **Fireflies** — an eye for a head, blurred wings, a pulsing lantern abdomen; they swarm in strings
+- **Jellyfish** — translucent bell with a slit eye inside, stinging tentacles; bursts into a ring of stingers when you come close
+- **Spiders** — skull-marked abdomen, red eye cluster, eight high-stepping legs, shoot web projectiles
+- **Ghosts** — skull specters trailing ectoplasm; teleport to new positions
+- **Octopuses** — mottled mantle, one live eye and one dead, sucker-lined arms; drop ink bombs
+- **Chameleons** — colour-cycling lizards that cloak until only the eyes are left
+- **Devils** — horned heads of cracked rock with a mane of fire; charge at the player and shoot fireballs
 
 ### Bosses
-Each phase ends with a unique boss — all canvas-animated with distinct creature designs:
+Each phase ends with the monarch of that phase. Every boss visibly comes apart as its health drains:
 
 | Phase | Boss | Visual |
 |-------|------|--------|
-| 1 | Critter Queen | Armored beetle with compound eyes, mandibles, segmented shell |
-| 2 | Firefly Monarch | Glowing queen with fluttering wings, bioluminescent abdomen |
-| 3 | Jellyfish Titan | Translucent dome bell with 10 flowing tentacles |
-| 4 | Spider Queen | 12 animated legs, 8 red eyes, toxic markings |
-| 5 | Ghost Wraith | Translucent body, void-black eyes with purple glow |
-| 6 | Kraken | 8 tentacles, dome head, W-shaped octopus pupils |
-| 7 | Chameleon Lord | Color-shifting body, curled tail, independent rotating slit eyes |
-| 8-10 | Demon Lords | Horns, fire aura, asymmetric glowing eyes, jagged mouth |
+| 1 | Bronze Colossus | Living asteroid: bronze slabs around a molten heart, furnace eye, boulder fists |
+| 2 | Crimson Scout | Critter queen: crowned head, great mandibles, glowing egg sac |
+| 3 | Viral Swarm | Firefly monarch: vast lantern abdomen, circling swarm |
+| 4 | Crimson Maw | Jellyfish titan: three-eyed bell over a ring of fangs |
+| 5 | Spider Queen | Skull-faced abdomen, venom fangs, eight independent legs |
+| 6 | Phantom Wailer | Great crowned skull with a hanging jaw and a storm of ectoplasm |
+| 7 | Void Bomber | Kraken: towering mantle, eight arms, two clubbed feelers |
+| 8 | Stealth Wraith | Chameleon lord: shimmering bands, lashing tongue, turret eyes |
+| 9 | Inferno Lord | Four-horned devil with a furnace maw |
+| 10 | Chaos Harbinger | Black idol with a wheel of bone blades, a ring of eyes and wings of fire |
 
 Bosses have evasive AI — they dodge away from player fire and perform strafing maneuvers. Each tier also has one of three fight archetypes, announced on its intro panel:
 - **Charger** — telegraphs with a red shudder, then dashes across the screen. Contact hurts.
